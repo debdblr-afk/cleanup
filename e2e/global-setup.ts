@@ -10,6 +10,8 @@ const CLIPS = [
   { name: "clip-a.webm", seconds: 2, w: 640, h: 360, hue: 200 },
   { name: "clip-b.webm", seconds: 3, w: 960, h: 540, hue: 20 },
   { name: "clip-sound.webm", seconds: 3, w: 1280, h: 720, hue: 120, tone: true },
+  // Just over a guest's 1-minute limit. Takes 62 s to record, once.
+  { name: "long-62s.webm", seconds: 62, w: 160, h: 90, hue: 280 },
 ];
 
 export default async function globalSetup(config: FullConfig) {

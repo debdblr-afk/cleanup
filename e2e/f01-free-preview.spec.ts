@@ -50,6 +50,16 @@ test.describe("F01 guest cleans a video and grabs the free preview", () => {
     await expect(page.getByRole("alert").filter({ hasText: "couldn't be opened" })).toBeVisible();
   });
 
+  test("F01-N4 a video over the plan's length is refused with the plan that takes it", async ({ page }) => {
+    await page.goto("/");
+    await attestBox(page).check();
+    await uploadFiles(page, ["long-62s.webm"]);
+    const alert = page.getByRole("alert").filter({ hasText: "long-62s.webm" });
+    await expect(alert).toContainText("is longer than 1:00, the limit on your plan");
+    await expect(alert).toContainText("Free takes videos up to 2:00");
+    expect(page.url()).not.toMatch(/\/b\//);
+  });
+
   test("F01-E1 a second visitor can't see the batch or its files", async ({ page, browser }) => {
     await startWithSample(page);
     await waitPreviewReady(page, /sample/i);

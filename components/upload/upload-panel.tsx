@@ -7,7 +7,7 @@ import { makeSampleClip } from "@/lib/engine/sample";
 import { formatBytes, formatDuration } from "@/lib/format";
 import { useStore } from "@/lib/data/hooks";
 import { addVideos, createBatch, getPlan, hasAttested, liveVideos, setAttested, type Rejection } from "@/lib/data/store";
-import { BATCH_LIMIT } from "@/lib/plans";
+import { BATCH_LIMIT, PLANS } from "@/lib/plans";
 import { Button, Checkbox } from "@/components/ui/primitives";
 import { toast } from "@/components/ui/toast";
 
@@ -16,7 +16,13 @@ function rejectionText(r: Rejection, maxBytes: number, maxMs: number): string {
     case "too_large": return `${r.filename} is bigger than ${formatBytes(maxBytes)}, the limit on your plan.`;
     case "unsupported": return `${r.filename} isn't a video we can open. Try MP4, MOV or WebM.`;
     case "batch_full": return `${r.filename} didn't fit: a batch holds ${BATCH_LIMIT} videos. Start a new batch for the rest.`;
-    case "too_long": return `${r.filename} is longer than ${formatDuration(maxMs)}.`;
+    case "too_long": {
+      // Say which plan takes it, so the next step is obvious.
+      const fits = (["free", "plus", "pro"] as const).map((id) => PLANS[id]).find((p) => (r.durationMs ?? Infinity) <= p.maxDurationMs);
+      const length = r.durationMs ? ` (${formatDuration(r.durationMs)})` : "";
+      return `${r.filename}${length} is longer than ${formatDuration(maxMs)}, the limit on your plan.` +
+        (fits ? ` ${fits.name} takes videos up to ${formatDuration(fits.maxDurationMs)}: see Pricing.` : ` The longest any plan takes is ${formatDuration(PLANS.pro.maxDurationMs)}.`);
+    }
     case "no_attestation": return "Tick the box to confirm you have the rights to these videos.";
     case "corrupt": return `${r.filename} couldn't be opened. It may be damaged or in a format this browser can't play.`;
     case "failed": return r.message ?? `${r.filename} couldn't be added. Try again.`;

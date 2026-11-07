@@ -251,7 +251,7 @@ export async function createBatch(): Promise<Batch> {
   return b;
 }
 
-export type Rejection = { filename: string; reason: RejectReason | "batch_full" | "no_attestation" | "failed"; message?: string };
+export type Rejection = { filename: string; reason: RejectReason | "batch_full" | "no_attestation" | "failed"; message?: string; durationMs?: number };
 
 export function liveVideos(batchId: string): Video[] {
   return [...state.videos.values()].filter((v) => v.batchId === batchId && v.status !== "deleted").sort((a, b) => a.position - b.position);
@@ -281,7 +281,7 @@ export async function addVideos(batchId: string, files: File[], source: "upload"
     if (file.size > plan.maxBytes) { rejected.push({ filename: file.name, reason: "too_large" }); continue; }
     let meta;
     try { meta = await probe(file); } catch { rejected.push({ filename: file.name, reason: "corrupt" }); continue; }
-    if (meta.durationMs > plan.maxDurationMs) { rejected.push({ filename: file.name, reason: "too_long" }); continue; }
+    if (meta.durationMs > plan.maxDurationMs) { rejected.push({ filename: file.name, reason: "too_long", durationMs: meta.durationMs }); continue; }
     try {
       const res = await api<{ video: Video; upload: { path: string; token: string } }>("/api/videos", {
         body: { batchId, filename: file.name || "video", contentType: type, sizeBytes: file.size, source, attest: true, attestationVersion: ATTESTATION_VERSION },
