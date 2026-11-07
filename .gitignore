@@ -48,3 +48,7 @@ next-env.d.ts
 /e2e/.results/
 /e2e/.report/
 /e2e/.fixtures/
+
+# desktop app build output
+/desktop/node_modules/
+/desktop/dist/
