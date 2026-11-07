@@ -20,12 +20,16 @@ export type Plan = {
 
 const MB = 1024 * 1024;
 const MIN = 60_000;
+// Hosting can cap uploads below the plan (Supabase's free plan stores files up to 50 MB):
+// set NEXT_PUBLIC_MAX_UPLOAD_MB and every plan shows and enforces the lower limit.
+const HOST_CAP = Number(process.env.NEXT_PUBLIC_MAX_UPLOAD_MB || 0) * MB || Infinity;
+const capped = (bytes: number) => Math.min(bytes, HOST_CAP);
 
 export const PLANS: Record<PlanId, Plan> = {
-  guest: { id: "guest", name: "Guest", pitch: "No account needed", previewsPerDay: 3, exportsPerDay: 0, maxDurationMs: 1 * MIN, maxBytes: 500 * MB, maxResolution: null, retentionDays: 1, monthly: null, yearlyPerMonth: null },
-  free: { id: "free", name: "Free", pitch: "Try it on short clips", previewsPerDay: 5, exportsPerDay: 0, maxDurationMs: 2 * MIN, maxBytes: 1024 * MB, maxResolution: null, retentionDays: 3, monthly: 0, yearlyPerMonth: 0 },
-  plus: { id: "plus", name: "Plus", pitch: "For weekly posting", previewsPerDay: 30, exportsPerDay: 10, maxDurationMs: 10 * MIN, maxBytes: 2048 * MB, maxResolution: "1080p", retentionDays: 14, monthly: 12, yearlyPerMonth: 9 },
-  pro: { id: "pro", name: "Pro", pitch: "For teams and agencies", previewsPerDay: 100, exportsPerDay: 50, maxDurationMs: 30 * MIN, maxBytes: 4096 * MB, maxResolution: "2160p", retentionDays: 30, monthly: 32, yearlyPerMonth: 24 },
+  guest: { id: "guest", name: "Guest", pitch: "No account needed", previewsPerDay: 3, exportsPerDay: 0, maxDurationMs: 1 * MIN, maxBytes: capped(500 * MB), maxResolution: null, retentionDays: 1, monthly: null, yearlyPerMonth: null },
+  free: { id: "free", name: "Free", pitch: "Try it on short clips", previewsPerDay: 5, exportsPerDay: 0, maxDurationMs: 2 * MIN, maxBytes: capped(1024 * MB), maxResolution: null, retentionDays: 3, monthly: 0, yearlyPerMonth: 0 },
+  plus: { id: "plus", name: "Plus", pitch: "For weekly posting", previewsPerDay: 30, exportsPerDay: 10, maxDurationMs: 10 * MIN, maxBytes: capped(2048 * MB), maxResolution: "1080p", retentionDays: 14, monthly: 12, yearlyPerMonth: 9 },
+  pro: { id: "pro", name: "Pro", pitch: "For teams and agencies", previewsPerDay: 100, exportsPerDay: 50, maxDurationMs: 30 * MIN, maxBytes: capped(4096 * MB), maxResolution: "2160p", retentionDays: 30, monthly: 32, yearlyPerMonth: 24 },
 };
 
 export const RESOLUTIONS: { id: Export["resolution"]; label: string; height: number }[] = [

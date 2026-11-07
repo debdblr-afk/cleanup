@@ -8,6 +8,8 @@ const inter = Inter({ subsets: ["latin"], variable: "--font-inter" });
 const mono = JetBrains_Mono({ subsets: ["latin"], variable: "--font-mono", weight: ["500"] });
 
 export const metadata: Metadata = {
+  // Absolute URLs for the link-preview image, from the site's public address.
+  metadataBase: new URL(process.env.NEXT_PUBLIC_SITE_URL ?? "http://localhost:5320"),
   title: { default: "Cleanup: remove logos and text from your videos", template: "%s · Cleanup" },
   description: "Remove your own logos, burned-in captions and stray text from videos you own. Preview free in your browser.",
 };
