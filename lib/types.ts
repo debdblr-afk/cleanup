@@ -88,6 +88,7 @@ export type Export = {
   errorMessage: string | null;
   createdAt: string;
   finishedAt: string | null;
+  format: "webm" | "mp4";
 };
 
 export type Profile = {

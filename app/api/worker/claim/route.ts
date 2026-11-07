@@ -9,7 +9,9 @@ export async function POST(req: Request) {
   if (isResponse(user)) return user;
   const input = await body(req, z.object({ workerId: z.string().min(8).max(64) }));
   if (isResponse(input)) return input;
-  const { data, error } = await db().rpc("claim_work", { p_user: user.id, p_worker: input.workerId } as never);
+  // With a server worker running, the tab only renders previews and leaves exports to it.
+  const exportsHere = process.env.NEXT_PUBLIC_EXPORT_WORKER !== "server";
+  const { data, error } = await db().rpc("claim_work", { p_user: user.id, p_worker: input.workerId, p_exports: exportsHere } as never);
   if (error) return json({ work: null });
   const w = data as { kind: "job" | "export"; row: Record<string, unknown> } | null;
   if (!w) return json({ work: null });

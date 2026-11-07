@@ -39,7 +39,7 @@ export function toExport(r: Row): Export {
   return {
     id: String(r.id), jobId: String(r.job_id), resolution: r.resolution as Export["resolution"], status: r.status as Export["status"],
     progress: Number(r.progress ?? 0), sizeBytes: n(r.size_bytes), errorMessage: s(r.error_message), createdAt: String(r.created_at),
-    finishedAt: s(r.finished_at),
+    finishedAt: s(r.finished_at), format: r.format === "mp4" ? "mp4" : "webm",
   };
 }
 

@@ -16,5 +16,6 @@ export async function POST(req: Request, { params }: { params: Promise<{ kind: s
   const videoId = await videoIdFor(kind as WorkKind, row);
   if (!videoId) return fail(404, "not_found", "No such video.");
   const path = kind === "jobs" ? keys.preview(user.id, videoId, id) : keys.result(user.id, videoId, id);
-  return json({ upload: await signedUpload(path) });
+  const { path: p, token } = await signedUpload(path);
+  return json({ upload: { path: p, token } });
 }

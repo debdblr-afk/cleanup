@@ -11,6 +11,9 @@ import { Dialog } from "@/components/ui/dialog";
 import { buttonClass, Button, ProgressBar } from "@/components/ui/primitives";
 import { baseName } from "@/components/batch/file-card";
 
+// With a server worker, exports render on the server as MP4 with sound and the tab can close.
+const SERVER_EXPORTS = process.env.NEXT_PUBLIC_EXPORT_WORKER === "server";
+
 export function ExportDialog({ job, video, open, onOpenChange }: { job: Job | null; video: Video | null; open: boolean; onOpenChange: (v: boolean) => void }) {
   useStore();
   const plan = getPlan();
@@ -55,7 +58,7 @@ export function ExportDialog({ job, video, open, onOpenChange }: { job: Job | nu
       </fieldset>
 
       {paid ? (
-        <p className="text-sm text-text-muted tabnums mt-4">{q.exportsLeft} of {q.exportsCap} exports left today. Exports render in this tab: keep it open until it finishes.</p>
+        <p className="text-sm text-text-muted tabnums mt-4">{q.exportsLeft} of {q.exportsCap} exports left today. {SERVER_EXPORTS ? "Exports render on our servers as MP4 with sound. You can close this page; it'll be here when you come back." : "Exports render in this tab: keep it open until it finishes."}</p>
       ) : (
         <div className="mt-4 rounded-lg bg-surface p-4 text-sm">
           <p className="font-semibold">Full-length exports are on Plus and Pro.</p>
@@ -83,7 +86,7 @@ export function ExportDialog({ job, video, open, onOpenChange }: { job: Job | nu
 }
 
 function ExportRow({ ex, filename }: { ex: Export; filename: string }) {
-  const url = useFileUrl("result", ex.id, ex.status === "done", `${baseName(filename)}-cleaned-${ex.resolution}.webm`);
+  const url = useFileUrl("result", ex.id, ex.status === "done", `${baseName(filename)}-cleaned-${ex.resolution}.${ex.format}`);
   const label = RESOLUTIONS.find((r) => r.id === ex.resolution)?.label;
   return (
     <li className="text-sm space-y-2">

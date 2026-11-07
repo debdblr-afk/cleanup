@@ -4,7 +4,7 @@
 // user B can see or touch nothing of user A's, then deletes both users.
 import { createClient } from "@supabase/supabase-js";
 import Stripe from "stripe";
-import { randomBytes, randomUUID } from "node:crypto";
+import { createHmac, randomBytes, randomUUID } from "node:crypto";
 
 const BASE = process.env.BASE ?? "http://localhost:5320";
 const URL_ = process.env.NEXT_PUBLIC_SUPABASE_URL;
@@ -176,6 +176,48 @@ try {
   const leftIds = (await admin.from("videos").select("id").in("id", [abandoned.id, fresh.id])).data.map((r) => r.id);
   check("sweep removes uploads abandoned for 3 h, keeps fresh ones", sw2.status === 200 && !leftIds.includes(abandoned.id) && leftIds.includes(fresh.id), JSON.stringify({ sw2: sw2.json, leftIds }));
   await call(A, "DELETE", `/api/videos/${fresh.id}`);
+
+  console.log("\nserver worker (signed)");
+  const signed = (route, body = {}, { id = "srv-test-worker", secret = process.env.WORKER_SECRET, ts = Math.floor(Date.now() / 1000), signPath = route } = {}) => {
+    const raw = JSON.stringify(body);
+    const sig = createHmac("sha256", secret).update(`${ts}.${id}.POST ${signPath}.${raw}`).digest("hex");
+    return fetch(BASE + route, { method: "POST", headers: { "content-type": "application/json", "x-worker-id": id, "x-worker-ts": String(ts), "x-worker-sig": sig }, body: raw })
+      .then(async (r) => ({ status: r.status, json: await r.json().catch(() => ({})) }));
+  };
+  check("unsigned claim -> 401", (await call(null, "POST", "/api/worker/server/claim", {})).status === 401);
+  check("wrong secret -> 401", (await signed("/api/worker/server/claim", {}, { secret: "x".repeat(64) })).status === 401);
+  check("expired signature -> 401", (await signed("/api/worker/server/claim", {}, { ts: Math.floor(Date.now() / 1000) - 900 })).status === 401);
+  check("signature for another route -> 401", (await signed("/api/worker/server/claim", {}, { signPath: "/api/worker/server/other" })).status === 401);
+  // The tab never takes exports while a server worker is configured.
+  const tabClaims = [];
+  for (let i = 0; i < 3; i++) { const c = await call(A, "POST", "/api/worker/claim", { workerId: "tab-only-previews" }); if (c.json.work) tabClaims.push(c.json.work); }
+  check("tab claim skips exports in server mode", tabClaims.every((w) => w.kind === "job"), JSON.stringify(tabClaims.map((w) => w.kind)));
+  for (const w of tabClaims) await admin.from("removal_jobs").update({ status: "queued", worker_ref: null }).eq("id", w.job.id);
+  // Claim until A's export comes up; anything older from other runs goes back as it was.
+  let mine = null; const others = [];
+  for (let i = 0; i < 10 && !mine; i++) {
+    const c = await signed("/api/worker/server/claim");
+    if (!c.json.work) break;
+    if (c.json.work.export.id === e1.json.export.id) mine = c.json.work; else others.push(c.json.work.export.id);
+  }
+  if (others.length) await admin.from("exports").update({ status: "queued", worker_ref: null }).in("id", others);
+  check("signed claim returns the export, its mask and a source URL", !!mine && mine.sourceUrl?.startsWith("http") && Array.isArray(mine.mask?.regions) && mine.video?.height === 360, JSON.stringify(mine && { ...mine, sourceUrl: "…" }));
+  if (mine) {
+    const route = (a) => `/api/worker/server/exports/${mine.export.id}/${a}`;
+    check("progress from the holder -> 200", (await signed(route("progress"), { progress: 40 })).status === 200);
+    check("progress from another worker -> 409", (await signed(route("progress"), { progress: 41 }, { id: "srv-someone-else" })).status === 409);
+    const early = await signed(route("complete"), { ok: true });
+    check("complete before the file arrives -> 409", early.status === 409);
+    const up = await signed(route("upload-url"));
+    const put = await fetch(up.json.upload.url, { method: "PUT", headers: { "content-type": "video/mp4", "x-upsert": "true" }, body: tinyVideo });
+    check("upload to the one-time URL", put.ok, String(put.status));
+    const fin = await signed(route("complete"), { ok: true, durationMs: 5000 });
+    const row = (await admin.from("exports").select("status, format, size_bytes").eq("id", mine.export.id).single()).data;
+    check("complete -> done, stored as MP4", fin.status === 200 && row.status === "done" && row.format === "mp4" && row.size_bytes === tinyVideo.length, JSON.stringify(row));
+    check("complete twice -> 409", (await signed(route("complete"), { ok: true })).status === 409);
+    const file = await fetch(`${BASE}/api/files?kind=result&id=${mine.export.id}`, { headers: { authorization: `Bearer ${A.token}` }, redirect: "manual" });
+    check("owner can fetch the MP4", file.status === 302 || file.status === 307, String(file.status));
+  }
 
   console.log("\nstripe webhook");
   const secret = process.env.STRIPE_WEBHOOK_SECRET;

@@ -5,8 +5,9 @@ import { SUPABASE_ANON_KEY, SUPABASE_URL } from "@/lib/supabase/env";
 // Refreshes the Supabase session cookie on page and API requests so handlers see a valid user.
 export async function middleware(request: NextRequest) {
   let response = NextResponse.next({ request });
-  // Webhooks and cron jobs carry their own auth; skip the cookie round trip.
-  if (request.nextUrl.pathname.startsWith("/api/webhooks") || request.nextUrl.pathname.startsWith("/api/cron")) return response;
+  // Webhooks, cron jobs and the server worker carry their own auth; skip the cookie round trip.
+  const p = request.nextUrl.pathname;
+  if (p.startsWith("/api/webhooks") || p.startsWith("/api/cron") || p.startsWith("/api/worker/server")) return response;
   const supabase = createServerClient(SUPABASE_URL, SUPABASE_ANON_KEY, {
     cookies: {
       getAll: () => request.cookies.getAll(),

@@ -9,6 +9,7 @@ export const FIXTURES = path.join(__dirname, ".fixtures");
 const CLIPS = [
   { name: "clip-a.webm", seconds: 2, w: 640, h: 360, hue: 200 },
   { name: "clip-b.webm", seconds: 3, w: 960, h: 540, hue: 20 },
+  { name: "clip-sound.webm", seconds: 3, w: 1280, h: 720, hue: 120, tone: true },
 ];
 
 export default async function globalSetup(config: FullConfig) {
@@ -24,12 +25,21 @@ export default async function globalSetup(config: FullConfig) {
   const page = await browser.newPage();
   await page.goto(`${baseURL}/legal/terms`);
   for (const c of missing) {
-    const b64 = await page.evaluate(async ({ seconds, w, h, hue }) => {
+    const b64 = await page.evaluate(async ({ seconds, w, h, hue, tone }) => {
       const canvas = document.createElement("canvas");
       canvas.width = w; canvas.height = h;
       document.body.appendChild(canvas);
       const ctx = canvas.getContext("2d")!;
-      const rec = new MediaRecorder(canvas.captureStream(30), { mimeType: "video/webm;codecs=vp8" });
+      const stream = canvas.captureStream(30);
+      if (tone) {
+        // A 440 Hz tone, so exports can be checked for sound.
+        const ac = new AudioContext();
+        const osc = ac.createOscillator();
+        const dest = ac.createMediaStreamDestination();
+        osc.connect(dest); osc.start();
+        stream.addTrack(dest.stream.getAudioTracks()[0]);
+      }
+      const rec = new MediaRecorder(stream, { mimeType: tone ? "video/webm;codecs=vp8,opus" : "video/webm;codecs=vp8" });
       const chunks: Blob[] = [];
       rec.ondataavailable = (e) => chunks.push(e.data);
       const done = new Promise<void>((r) => (rec.onstop = () => r()));

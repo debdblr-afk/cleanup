@@ -18,7 +18,7 @@ export const keys = {
 export async function signedUpload(path: string) {
   const { data, error } = await bucket().createSignedUploadUrl(path, { upsert: true });
   if (error || !data) throw error ?? new Error("no upload url");
-  return { path: data.path, token: data.token };
+  return { path: data.path, token: data.token, url: data.signedUrl };
 }
 
 /** Short-lived read URL. `download` sets the saved filename (Content-Disposition: attachment). */
