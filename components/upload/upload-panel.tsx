@@ -18,6 +18,8 @@ function rejectionText(r: Rejection, maxBytes: number, maxMs: number): string {
     case "batch_full": return `${r.filename} didn't fit: a batch holds ${BATCH_LIMIT} videos. Start a new batch for the rest.`;
     case "too_long": return `${r.filename} is longer than ${formatDuration(maxMs)}.`;
     case "no_attestation": return "Tick the box to confirm you have the rights to these videos.";
+    case "corrupt": return `${r.filename} couldn't be opened. It may be damaged or in a format this browser can't play.`;
+    case "failed": return r.message ?? `${r.filename} couldn't be added. Try again.`;
     default: return `${r.filename} couldn't be read.`;
   }
 }
@@ -58,7 +60,13 @@ export function UploadPanel({ variant, batchId }: { variant: "hero" | "tile"; ba
     setBusy(true);
     setError(null);
     try {
-      const target = batchId ?? (await createBatch()).id;
+      let target: string;
+      try {
+        target = batchId ?? (await createBatch()).id;
+      } catch (e) {
+        setError(e instanceof Error ? e.message : "Couldn't start. Try again.");
+        return;
+      }
       const { added, rejected } = await addVideos(target, files, source);
       const p = getPlan();
       if (rejected.length) {
@@ -164,7 +172,7 @@ export function UploadPanel({ variant, batchId }: { variant: "hero" | "tile"; ba
 
       <details className="text-sm">
         <summary className="cursor-pointer inline-flex items-center gap-2 text-text-muted hover:text-text"><Link2 className="size-4" aria-hidden />Add from a link</summary>
-        <p className="mt-2 text-xs text-text-muted">Importing from a link needs the server, which isn&apos;t connected yet. Download the file and upload it for now.</p>
+        <p className="mt-2 text-xs text-text-muted">Importing from a link isn&apos;t available yet. Download the file and upload it for now.</p>
       </details>
     </div>
   );

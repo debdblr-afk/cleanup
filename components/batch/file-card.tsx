@@ -4,7 +4,6 @@ import { Download, Ellipsis, Pencil, Trash2 } from "lucide-react";
 import Link from "next/link";
 import { useStore, useFileUrl } from "@/lib/data/hooks";
 import { cancelJob, createJob, getPlan, latestJob, queuePosition, quotaStatus, removeVideo, retryJob } from "@/lib/data/store";
-import { extensionFor } from "@/lib/engine/video";
 import { formatBytes, formatDuration, formatResolution, ordinal } from "@/lib/format";
 import type { Job, Video } from "@/lib/types";
 import { buttonClass, Button, ProgressBar, StatusBadge } from "@/components/ui/primitives";
@@ -22,6 +21,7 @@ export function FileCard({ video, onExport }: { video: Video; onExport: (job: Jo
   const done = job?.status === "done";
   const original = useFileUrl("original", video.id, done);
   const preview = useFileUrl("preview", job?.id, done);
+  const previewDownload = useFileUrl("preview", job?.id, done, `${baseName(video.filename)}-cleaned-5s.webm`);
 
   const meta = [formatDuration(video.durationMs), formatResolution(video.height), formatBytes(video.sizeBytes)].filter(Boolean).join(" · ");
 
@@ -73,8 +73,8 @@ export function FileCard({ video, onExport }: { video: Video; onExport: (job: Jo
         <StatusBadge tone="success">Preview ready</StatusBadge>
         <div className="flex gap-2">
           <Link href={editHref} className={buttonClass("outline", "sm")}>Edit</Link>
-          {preview && (
-            <a href={preview} download={`${baseName(video.filename)}-cleaned-5s.${extensionFor("video/webm")}`} className={buttonClass("outline", "sm")} aria-label={`Download 5 second preview of ${video.filename}`}>
+          {previewDownload && (
+            <a href={previewDownload} download className={buttonClass("outline", "sm")} aria-label={`Download 5 second preview of ${video.filename}`}>
               <Download className="size-4" aria-hidden />
             </a>
           )}

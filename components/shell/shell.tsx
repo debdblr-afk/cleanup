@@ -4,7 +4,7 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useEffect, useState } from "react";
 import { useStore } from "@/lib/data/hooks";
-import { getPlan, quotaStatus } from "@/lib/data/store";
+import { getPlan, getState, quotaStatus } from "@/lib/data/store";
 import { buttonClass } from "@/components/ui/primitives";
 
 export function SkipLink() {
@@ -49,6 +49,16 @@ export function QuotaMeter({ compact = false }: { compact?: boolean }) {
   );
 }
 
+function AccountLink() {
+  useStore();
+  const [mounted, setMounted] = useState(false);
+  useEffect(() => setMounted(true), []);
+  const profile = mounted ? getState().profile : null;
+  if (profile && !profile.isAnonymous)
+    return <Link href="/account" className={buttonClass("outline", "sm", "rounded-pill max-w-[180px]")}><span className="truncate">{profile.email ?? "Account"}</span></Link>;
+  return <Link href="/login" className={buttonClass("secondary", "sm", "rounded-pill")}>{profile ? "Save work" : "Log in"}</Link>;
+}
+
 export function SiteHeader() {
   const [open, setOpen] = useState(false);
   const path = usePathname();
@@ -66,7 +76,7 @@ export function SiteHeader() {
         </nav>
         <div className="ml-auto flex items-center gap-3">
           <div className="hidden md:block"><QuotaMeter /></div>
-          <Link href="/login" className={buttonClass("secondary", "sm", "rounded-pill")}>Log in</Link>
+          <AccountLink />
           <button className="lg:hidden size-10 grid place-items-center rounded-md hover:bg-surface-hover" aria-label={open ? "Close menu" : "Open menu"} aria-expanded={open} aria-controls="mobile-nav" onClick={() => setOpen(!open)}>
             {open ? <X className="size-5" aria-hidden /> : <Menu className="size-5" aria-hidden />}
           </button>

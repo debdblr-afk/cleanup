@@ -16,16 +16,18 @@ const PAGES: Record<string, { title: string; body: string[] }> = {
   privacy: {
     title: "Privacy (draft)",
     body: [
-      "In this preview, videos never leave your browser: they're stored and processed on your device.",
-      "Once the service runs on servers, uploads are kept only as long as your plan says, then deleted, and never used to train models without your opt-in.",
-      "You can delete everything at any time from the Your videos page.",
+      "Your videos are stored privately and only reachable through short-lived links made for you. They're deleted when your plan's retention ends (1 to 30 days), and never used to train models.",
+      "Cleaning currently runs in your own browser tab; your videos are uploaded only so you can come back to them and download results.",
+      "Processors we use: Supabase (database, sign-in, file storage), Stripe (payments; we never see card numbers), Resend (email), and our hosting provider. A GPU processing provider will be added and listed here before it's used.",
+      "We record the date you confirmed you have the rights to each video. We don't sell data or use ad trackers.",
+      "Delete your account at any time from the Your videos page: every file, record and subscription goes with it.",
     ],
   },
   takedown: {
     title: "Copyright & takedown",
     body: [
       "If you believe a video processed with Cleanup infringes your rights, send a notice with: your name and contact details, the work you own, where the infringing copy is, a statement of good faith, and your signature.",
-      "The online form opens with the server version. Until then, this preview stores nothing outside the user's own browser.",
+      "Send it through the takedown form (POST /api/takedowns; a page form arrives with /replica-launch) or to the address on our contact page. We act on valid notices and remove the content.",
     ],
   },
 };

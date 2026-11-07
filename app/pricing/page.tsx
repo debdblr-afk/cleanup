@@ -1,8 +1,12 @@
 "use client";
 import { Check, Minus } from "lucide-react";
 import Link from "next/link";
-import { useState } from "react";
-import { buttonClass } from "@/components/ui/primitives";
+import { useRouter, useSearchParams } from "next/navigation";
+import { Suspense, useCallback, useEffect, useRef, useState } from "react";
+import { Button, buttonClass } from "@/components/ui/primitives";
+import { toast } from "@/components/ui/toast";
+import { useStore } from "@/lib/data/hooks";
+import { getState } from "@/lib/data/store";
 import { formatDuration } from "@/lib/format";
 import { PLANS, RESOLUTIONS, type Plan } from "@/lib/plans";
 
@@ -32,7 +36,47 @@ const FAQ = [
 ];
 
 export default function PricingPage() {
-  const [yearly, setYearly] = useState(true);
+  return <Suspense><Pricing /></Suspense>;
+}
+
+function Pricing() {
+  const { hydrated } = useStore();
+  const router = useRouter();
+  const params = useSearchParams();
+  const [yearly, setYearly] = useState(params.get("interval") !== "month");
+  const [pending, setPending] = useState<string | null>(null);
+  const resumed = useRef(false);
+
+  const choose = useCallback(async (plan: "plus" | "pro", interval: "month" | "year") => {
+    const profile = getState().profile;
+    if (!profile || profile.isAnonymous) {
+      router.push(`/login?next=${encodeURIComponent(`/pricing?plan=${plan}&interval=${interval}`)}`);
+      return;
+    }
+    setPending(plan);
+    try {
+      const res = await fetch("/api/billing/checkout", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ plan, interval }) });
+      const data = await res.json();
+      if (res.ok && data.url) window.location.href = data.url;
+      else toast(data.error?.message ?? "Couldn't start checkout.", "error");
+    } finally {
+      setPending(null);
+    }
+  }, [router]);
+
+  // Back from signing in with a plan picked: carry on to checkout once.
+  useEffect(() => {
+    const plan = params.get("plan");
+    if (!hydrated || resumed.current || (plan !== "plus" && plan !== "pro")) return;
+    const profile = getState().profile;
+    if (!profile || profile.isAnonymous) return;
+    resumed.current = true;
+    void choose(plan, params.get("interval") === "month" ? "month" : "year");
+  }, [hydrated, params, choose]);
+
+  useEffect(() => {
+    if (params.get("checkout") === "canceled") toast("Checkout canceled. Nothing was charged.", "info");
+  }, [params]);
   return (
     <div className="mx-auto max-w-page px-4 lg:px-8 py-12">
       <div className="text-center max-w-[720px] mx-auto">
@@ -63,10 +107,14 @@ export default function PricingPage() {
                 {!!price && <span className="text-sm text-text-muted">/mo</span>}
               </p>
               <p className="text-xs text-text-muted h-8">{!price ? "No card needed" : yearly ? `Billed $${price * 12} a year` : "Renews monthly, cancel any time"}</p>
-              <Link href={p.id === "free" ? "/" : `/login?next=checkout&plan=${p.id}&interval=${yearly ? "year" : "month"}`}
-                className={buttonClass(featured ? "primary" : p.id === "pro" ? "secondary" : "outline", "lg", "w-full")}>
-                {p.id === "free" ? "Start cleaning" : `Choose ${p.name}`}
-              </Link>
+              {p.id === "free" ? (
+                <Link href="/" className={buttonClass("outline", "lg", "w-full")}>Start cleaning</Link>
+              ) : (
+                <Button variant={featured ? "primary" : "secondary"} size="lg" className="w-full" loading={pending === p.id}
+                  onClick={() => choose(p.id as "plus" | "pro", yearly ? "year" : "month")}>
+                  Choose {p.name}
+                </Button>
+              )}
               <ul className="mt-6 space-y-2 text-sm">
                 <li className="flex gap-2"><Check className="size-4 text-success mt-0.5 shrink-0" aria-hidden />{p.previewsPerDay} previews a day</li>
                 <li className="flex gap-2">{p.exportsPerDay ? <Check className="size-4 text-success mt-0.5 shrink-0" aria-hidden /> : <Minus className="size-4 text-text-muted mt-0.5 shrink-0" aria-hidden />}{p.exportsPerDay ? `${p.exportsPerDay} full exports a day, up to ${res(p)}` : "Preview downloads only"}</li>
@@ -76,7 +124,7 @@ export default function PricingPage() {
           );
         })}
       </div>
-      <p className="text-xs text-text-muted mt-3 text-center">Prices are placeholders. Payments aren&apos;t connected yet.</p>
+      <p className="text-xs text-text-muted mt-3 text-center">Prices are placeholders. Checkout runs in Stripe test mode until launch.</p>
 
       <section className="mt-16" aria-labelledby="compare">
         <h2 id="compare" className="text-xl">Compare plans</h2>

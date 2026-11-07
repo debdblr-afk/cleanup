@@ -386,10 +386,10 @@ function VersionRow({ job, n, onCompare, onCancel }: { job: Job; n: number; onCo
 }
 
 function DownloadPreview({ job, filename }: { job: Job; filename: string }) {
-  const url = useFileUrl("preview", job.id, job.status === "done");
+  const url = useFileUrl("preview", job.id, job.status === "done", `${baseName(filename)}-cleaned-5s.webm`);
   if (!url) return null;
   return (
-    <a href={url} download={`${baseName(filename)}-cleaned-5s.webm`} className={buttonClass("outline", "sm")}>
+    <a href={url} download className={buttonClass("outline", "sm")}>
       <Download className="size-4" aria-hidden />5 s preview
     </a>
   );

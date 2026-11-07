@@ -4,7 +4,6 @@ import Link from "next/link";
 import { useState } from "react";
 import { useFileUrl, useStore } from "@/lib/data/hooks";
 import { createExport, exportsFor, getPlan, quotaStatus } from "@/lib/data/store";
-import { extensionFor } from "@/lib/engine/video";
 import { formatBytes, formatDuration } from "@/lib/format";
 import { RESOLUTIONS, resolutionAllowed } from "@/lib/plans";
 import type { Export, Job, Video } from "@/lib/types";
@@ -19,7 +18,7 @@ export function ExportDialog({ job, video, open, onOpenChange }: { job: Job | nu
   const firstAllowed = RESOLUTIONS.find((r) => resolutionAllowed(plan, r.id) && video?.height && r.height <= Math.max(720, video.height))?.id ?? "720p";
   const [res, setRes] = useState<Export["resolution"]>(firstAllowed);
   const [message, setMessage] = useState<string | null>(null);
-  const preview = useFileUrl("preview", job?.id, job?.status === "done");
+  const preview = useFileUrl("preview", job?.id, job?.status === "done", video ? `${baseName(video.filename)}-cleaned-5s.webm` : undefined);
   if (!job || !video) return null;
   const exports = exportsFor(job.id);
   const paid = !!plan.maxResolution;
@@ -75,7 +74,7 @@ export function ExportDialog({ job, video, open, onOpenChange }: { job: Job | nu
 
       <div className="flex flex-wrap justify-end gap-2 mt-6">
         {preview && (
-          <a href={preview} download={`${baseName(video.filename)}-cleaned-5s.webm`} className={buttonClass("ghost", "md")}>Download 5 s preview</a>
+          <a href={preview} download className={buttonClass("ghost", "md")}>Download 5 s preview</a>
         )}
         {paid && <Button onClick={start}>Export {RESOLUTIONS.find((r) => r.id === res)?.label}</Button>}
       </div>
@@ -84,14 +83,14 @@ export function ExportDialog({ job, video, open, onOpenChange }: { job: Job | nu
 }
 
 function ExportRow({ ex, filename }: { ex: Export; filename: string }) {
-  const url = useFileUrl("result", ex.id, ex.status === "done");
+  const url = useFileUrl("result", ex.id, ex.status === "done", `${baseName(filename)}-cleaned-${ex.resolution}.webm`);
   const label = RESOLUTIONS.find((r) => r.id === ex.resolution)?.label;
   return (
     <li className="text-sm space-y-2">
       <div className="flex items-center justify-between gap-2">
         <span className="font-medium">{label} · full length</span>
         {ex.status === "done" && url ? (
-          <a href={url} download={`${baseName(filename)}-cleaned-${ex.resolution}.${extensionFor("video/webm")}`} className={buttonClass("primary", "sm")}>
+          <a href={url} download className={buttonClass("primary", "sm")}>
             <Download className="size-4" aria-hidden /> Download {formatBytes(ex.sizeBytes)}
           </a>
         ) : ex.status === "failed" ? (

@@ -29,13 +29,13 @@ export type Batch = {
 };
 
 export type VideoStatus = "uploading" | "probing" | "ready" | "rejected" | "deleted";
-export type RejectReason = "too_long" | "too_large" | "unsupported" | "corrupt";
+export type RejectReason = "too_long" | "too_large" | "unsupported" | "corrupt" | "fetch_failed";
 
 export type Video = {
   id: string;
   batchId: string;
   position: number;
-  source: "upload" | "sample";
+  source: "upload" | "url" | "sample";
   filename: string;
   contentType: string;
   sizeBytes: number;
@@ -44,7 +44,7 @@ export type Video = {
   durationMs: number | null;
   width: number | null;
   height: number | null;
-  thumbnail: string | null; // small JPEG data URL
+  thumbnail: string | null; // URL of a small JPEG (served by /api/files)
   rightsAttestedAt: string;
   attestationVersion: string;
   createdAt: string;
@@ -82,4 +82,12 @@ export type Export = {
   errorMessage: string | null;
   createdAt: string;
   finishedAt: string | null;
+};
+
+export type Profile = {
+  id: string;
+  email: string | null;
+  isAnonymous: boolean;
+  plan: "free" | "plus" | "pro";
+  hasBilling: boolean;
 };
