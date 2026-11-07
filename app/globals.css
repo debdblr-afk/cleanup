@@ -1,0 +1,39 @@
+@import "tailwindcss";
+/* Generated from replica-watermark/design/tokens.json (npm run tokens). Edit the tokens, not these files. */
+@import "./styles/tokens.css";
+@import "./styles/tailwind-theme.css";
+
+:root {
+  /* next/font serves Inter and JetBrains Mono under generated family names. */
+  --t-font-sans: var(--font-inter), ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+  --t-font-mono: var(--font-mono), ui-monospace, SFMono-Regular, Menlo, monospace;
+}
+
+@custom-variant pointer-coarse (@media (pointer: coarse));
+
+@layer base {
+  body {
+    background: var(--t-color-bg);
+    color: var(--t-color-text);
+    font-family: var(--t-font-sans);
+    -webkit-font-smoothing: antialiased;
+  }
+  h1, h2, h3 { text-wrap: balance; }
+  :focus-visible { outline: 2px solid var(--t-color-focus); outline-offset: 2px; }
+  .on-canvas :focus-visible { outline-color: var(--t-color-on-canvas); }
+  ::selection { background: var(--t-color-accent); color: var(--t-color-on-accent); }
+}
+
+@utility tabnums { font-variant-numeric: tabular-nums; }
+
+/* Stand-in demo frames on the landing page: our own gradients, not anyone's footage. */
+@utility scene {
+  background: radial-gradient(120% 90% at 30% 20%, #6b8fb3 0%, #2d4a66 45%, #18242f 100%);
+}
+@utility hatch {
+  background-image: repeating-linear-gradient(45deg, var(--t-color-mask-protect-fill) 0 6px, transparent 6px 12px);
+}
+
+@keyframes slide { from { transform: translateX(-100%); } to { transform: translateX(330%); } }
+@keyframes fade { from { opacity: 0; } to { opacity: 1; } }
+@keyframes rise { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: none; } }
