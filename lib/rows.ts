@@ -1,6 +1,7 @@
 // Database rows (snake_case, from RLS reads, Realtime and API responses) -> app types.
 import { isMask } from "./mask";
 import type { Batch, Export, Job, Mask, PlanId, Profile, Video } from "./types";
+import { DEFAULT_PLAN } from "./plans";
 
 type Row = Record<string, unknown>;
 const s = (v: unknown) => (v == null ? null : String(v));
@@ -46,13 +47,14 @@ export function toExport(r: Row): Export {
 export function toProfile(r: Row): Profile {
   return {
     id: String(r.id), email: s(r.email), isAnonymous: Boolean(r.is_anonymous),
-    plan: (r.plan as Profile["plan"]) ?? "free", hasBilling: Boolean(r.stripe_customer_id),
+    plan: (r.plan as Profile["plan"]) ?? "free",
   };
 }
 
-/** Guests are anonymous accounts. A dev-only demo plan on a guest still counts (ALLOW_DEMO_PLAN). */
-export function planIdFor(p: { isAnonymous: boolean; plan: Profile["plan"] } | null): PlanId {
-  if (!p) return "guest";
-  if (p.isAnonymous) return p.plan === "free" ? "guest" : p.plan;
-  return p.plan;
+/**
+ * There are no paid plans: everyone, guests included, gets the Pro limits (DEFAULT_PLAN).
+ * Kept as a function so limits can differ again later without touching every caller.
+ */
+export function planIdFor(): PlanId {
+  return DEFAULT_PLAN;
 }

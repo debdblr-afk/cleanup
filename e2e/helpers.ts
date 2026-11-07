@@ -63,15 +63,6 @@ export async function waitPreviewReady(page: Page, filename: string | RegExp) {
   await expect(card(page, filename).getByText("Preview ready")).toBeVisible({ timeout: 90_000 });
 }
 
-/** The dev-only plan switcher on /account (needs ALLOW_DEMO_PLAN=1). */
-export async function setDemoPlan(page: Page, plan: "Free" | "Plus" | "Pro") {
-  const back = page.url();
-  await page.goto("/account");
-  await page.getByRole("radio", { name: plan, exact: true }).click(); // controlled: checks once the server agrees
-  await expect(page.getByText(`Now on ${plan} (demo)`)).toBeVisible();
-  await expect(page.getByRole("heading", { name: `Plan: ${plan}` })).toBeVisible();
-  if (back && !back.endsWith("/account")) await page.goto(back);
-}
 
 export const MAILPIT = "http://127.0.0.1:55324";
 

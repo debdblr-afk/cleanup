@@ -4,7 +4,7 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useEffect, useState } from "react";
 import { useStore } from "@/lib/data/hooks";
-import { getPlan, getState, quotaStatus } from "@/lib/data/store";
+import { getState, quotaStatus } from "@/lib/data/store";
 import { buttonClass } from "@/components/ui/primitives";
 
 export function SkipLink() {
@@ -17,7 +17,6 @@ export function SkipLink() {
 
 const NAV = [
   { href: "/", label: "Remove watermark" },
-  { href: "/pricing", label: "Pricing" },
   { href: "/account", label: "Your videos" },
 ];
 
@@ -39,12 +38,12 @@ export function QuotaMeter({ compact = false }: { compact?: boolean }) {
   if (q.previewsLeft === 0)
     return (
       <p className="text-xs text-warning tabnums">
-        No previews left today. Resets in {q.resetsInHours} h. <Link href="/pricing" className="underline">See plans</Link>
+        No previews left today. Resets in {q.resetsInHours} h.
       </p>
     );
   return (
     <p className="text-xs text-text-muted tabnums">
-      {q.previewsLeft} of {q.previewsCap} {compact ? "previews" : `${getPlan().id === "guest" ? "free " : ""}previews left today`} · resets in {q.resetsInHours} h
+      {q.previewsLeft} of {q.previewsCap} {compact ? "previews" : "previews left today"} · resets in {q.resetsInHours} h
     </p>
   );
 }

@@ -21,8 +21,7 @@ test.describe("F06 accounts", () => {
     await expect(page.getByRole("button", { name: "Continue with Google" })).toHaveCount(0);
   });
 
-  test("F06-H1 guest adds an email, confirms it, keeps the batch, signs out", async ({ page }, info) => {
-    info.annotations.push({ type: "allow-5xx", description: "/api/billing/checkout" });
+  test("F06-H1 guest adds an email, confirms it, keeps the batch, signs out", async ({ page }) => {
     const email = `e2e-${Date.now()}@example.test`;
     await startWithSample(page);
     const batch = page.url();
@@ -34,21 +33,17 @@ test.describe("F06 accounts", () => {
     await page.goto(await latestLinkFor(email));
     await page.waitForURL(/\/account/);
     await expect(page.getByRole("main").getByText(email)).toBeVisible();
-    await expect(page.getByRole("heading", { name: "Plan: Free" })).toBeVisible();
+    await expect(page.getByRole("heading", { name: "Today" })).toBeVisible();
+    await expect(page.getByText(/Videos up to 30:00/)).toBeVisible();
     await page.goto(batch);
     await waitPreviewReady(page, /sample/i);
 
     // BUG-009: the signed-in email in the header must fit a 375 px phone.
     await page.setViewportSize({ width: 375, height: 812 });
-    await page.goto("/pricing");
+    await page.goto("/account");
     await expect(page.getByRole("button", { name: "Open menu" })).toBeInViewport({ ratio: 1 });
     await noHorizontalScroll(page);
     await page.setViewportSize({ width: 1440, height: 900 });
-
-    // Signed in, no Stripe key on this machine: checkout says so instead of failing.
-    await page.goto("/pricing");
-    await page.getByRole("button", { name: "Choose Plus" }).click();
-    await expect(page.getByText(/aren.t set up/i)).toBeVisible();
 
     await page.goto("/account");
     await page.getByRole("button", { name: "Sign out", exact: true }).click();
@@ -73,7 +68,7 @@ test.describe("F06 accounts", () => {
 });
 
 test.describe("Every page at 390 px and 1440 px", () => {
-  for (const path of ["/", "/pricing", "/login", "/account", "/legal/terms", "/legal/privacy", "/legal/takedown", "/nope"]) {
+  for (const path of ["/", "/login", "/account", "/legal/terms", "/legal/privacy", "/legal/takedown", "/nope"]) {
     test(`X-E1 ${path} has no sideways scroll and passes axe`, async ({ page }) => {
       for (const w of [390, 1440]) {
         await page.setViewportSize({ width: w, height: 900 });
@@ -84,4 +79,10 @@ test.describe("Every page at 390 px and 1440 px", () => {
       }
     });
   }
+});
+
+test("X-E2 the old pricing page sends you home", async ({ page }) => {
+  await page.goto("/pricing");
+  await expect(page).toHaveURL(/\/$/);
+  await expect(page.getByRole("link", { name: "Pricing" })).toHaveCount(0);
 });

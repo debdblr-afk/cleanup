@@ -32,6 +32,9 @@ export const PLANS: Record<PlanId, Plan> = {
   pro: { id: "pro", name: "Pro", pitch: "For teams and agencies", previewsPerDay: 100, exportsPerDay: 50, maxDurationMs: 30 * MIN, maxBytes: capped(4096 * MB), maxResolution: "2160p", retentionDays: 30, monthly: 32, yearlyPerMonth: 24 },
 };
 
+/** Everyone gets this plan's limits: there are no paid tiers (owner's decision, 2026-11-07). */
+export const DEFAULT_PLAN: PlanId = "pro";
+
 export const RESOLUTIONS: { id: Export["resolution"]; label: string; height: number }[] = [
   { id: "720p", label: "720p", height: 720 },
   { id: "1080p", label: "1080p", height: 1080 },

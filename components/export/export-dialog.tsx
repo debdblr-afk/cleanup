@@ -1,6 +1,5 @@
 "use client";
 import { Download, Lock } from "lucide-react";
-import Link from "next/link";
 import { useState } from "react";
 import { useFileUrl, useStore } from "@/lib/data/hooks";
 import { createExport, exportsFor, getPlan, quotaStatus } from "@/lib/data/store";
@@ -24,13 +23,12 @@ export function ExportDialog({ job, video, open, onOpenChange }: { job: Job | nu
   const preview = useFileUrl("preview", job?.id, job?.status === "done", video ? `${baseName(video.filename)}-cleaned-5s.webm` : undefined);
   if (!job || !video) return null;
   const exports = exportsFor(job.id);
-  const paid = !!plan.maxResolution;
 
   const start = async () => {
     setMessage(null);
     const r = await createExport(job.id, res);
     if (r.ok) return;
-    if (r.reason === "upgrade") setMessage("That resolution isn't on your plan.");
+    if (r.reason === "upgrade") setMessage("That resolution isn't available.");
     else if (r.reason === "busy") setMessage("That export is already running or done. It's listed below.");
     else if (r.reason === "daily_cap") setMessage(`No exports left today. They reset in ${r.resetsInHours} h.`);
     else setMessage("The preview isn't ready yet.");
@@ -38,7 +36,7 @@ export function ExportDialog({ job, video, open, onOpenChange }: { job: Job | nu
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange} title="Export video" description={`${video.filename} · full length ${formatDuration(video.durationMs)}`}>
-      <fieldset className="grid grid-cols-2 gap-2 text-sm" disabled={!paid}>
+      <fieldset className="grid grid-cols-2 gap-2 text-sm">
         <legend className="sr-only">Resolution</legend>
         {RESOLUTIONS.map((r) => {
           const allowed = resolutionAllowed(plan, r.id);
@@ -50,22 +48,13 @@ export function ExportDialog({ job, video, open, onOpenChange }: { job: Job | nu
                 ? <input type="radio" name="res" value={r.id} checked={res === r.id} onChange={() => setRes(r.id)} className="accent-[var(--t-color-accent)]" />
                 : <Lock className="size-4" aria-hidden />}
               {r.label}
-              {!allowed && <span className="text-xs ml-auto">{r.id === "2160p" || r.id === "1440p" ? "Pro" : "Plus"}</span>}
               {allowed && upscale && <span className="text-xs ml-auto">Above source</span>}
             </label>
           );
         })}
       </fieldset>
 
-      {paid ? (
-        <p className="text-sm text-text-muted tabnums mt-4">{q.exportsLeft} of {q.exportsCap} exports left today. {SERVER_EXPORTS ? "Exports render on our servers as MP4 with sound. You can close this page; it'll be here when you come back." : "Exports render in this tab: keep it open until it finishes."}</p>
-      ) : (
-        <div className="mt-4 rounded-lg bg-surface p-4 text-sm">
-          <p className="font-semibold">Full-length exports are on Plus and Pro.</p>
-          <p className="text-text-muted mt-1">Your free preview covers the first 5 seconds and is yours to download.</p>
-          <Link href="/pricing" className={buttonClass("primary", "md", "mt-3")}>See plans</Link>
-        </div>
-      )}
+      <p className="text-sm text-text-muted tabnums mt-4">{q.exportsLeft} of {q.exportsCap} exports left today. {SERVER_EXPORTS ? "Exports render on our servers as MP4 with sound. You can close this page; it'll be here when you come back." : "Exports render in this tab with the original sound: keep it open until it finishes."}</p>
 
       {message && <p role="alert" className="text-sm text-danger mt-3">{message}</p>}
 
@@ -79,7 +68,7 @@ export function ExportDialog({ job, video, open, onOpenChange }: { job: Job | nu
         {preview && (
           <a href={preview} download className={buttonClass("ghost", "md")}>Download 5 s preview</a>
         )}
-        {paid && <Button onClick={start}>Export {RESOLUTIONS.find((r) => r.id === res)?.label}</Button>}
+        <Button onClick={start}>Export {RESOLUTIONS.find((r) => r.id === res)?.label}</Button>
       </div>
     </Dialog>
   );

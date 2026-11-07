@@ -55,7 +55,7 @@ export function FileCard({ video, onExport }: { video: Video; onExport: (job: Jo
   } else if (video.status === "rejected") {
     const plan = getPlan();
     body = video.rejectReason === "too_long"
-      ? (<><StatusBadge tone="warning">Too long</StatusBadge><p className="text-xs text-text-muted">Your plan takes videos up to {formatDuration(plan.maxDurationMs)}. <Link href="/pricing" className="text-accent underline">See plans</Link></p></>)
+      ? (<><StatusBadge tone="warning">Too long</StatusBadge><p className="text-xs text-text-muted">Videos can be up to {formatDuration(plan.maxDurationMs)}. Trim it and add it again.</p></>)
       : (<><StatusBadge tone="danger">Can&apos;t open</StatusBadge><p className="text-xs text-text-muted">This file couldn&apos;t be read. It may be damaged or use a format this browser can&apos;t play.</p></>);
   } else if (!job) {
     const q = quotaStatus();

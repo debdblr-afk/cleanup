@@ -13,14 +13,14 @@ const FEATURES = [
   { id: "auto", tab: "Finds it for you", title: "Automatic detection", body: "Marks that stay in one place while the scene changes are picked up on their own. No drawing needed for the usual corner logo or handle." },
   { id: "hand", tab: "Fix by hand", title: "Erase and keep zones", body: "Missed a spot? Draw an erase box over it. Want a face or a product left exactly as it is? Draw a keep zone and nothing inside it changes." },
   { id: "batch", tab: "Many at once", title: "Batches of 30", body: "Clean a week of posts in one go. Every video is processed and previewed on its own card, and one failure never holds up the rest." },
-  { id: "free", tab: "Try before you pay", title: "Free 5-second preview", body: "See the result on your own footage before spending anything. The full-length export is the only part that's paid." },
+  { id: "free", tab: "Check first", title: "5-second preview", body: "See the result on your own footage in seconds, fix any spot the cleaner missed, then export the whole video with its sound." },
 ];
 
 const FAQ = [
   { q: "Whose videos can I clean?", a: "Your own, or ones you have permission to edit. Cleanup is for removing your old branding, burned-in captions and stray text, not for taking someone else's watermark off their work. Rights holders can report misuse on the takedown page." },
   { q: "Does it work on moving watermarks?", a: "Static marks work today. Tracking marks that drift across the frame comes with the GPU engine. Until then, draw an erase zone over the area they move through." },
   { q: "Where do my files go?", a: "To private storage that only your account can reach, through links that expire after a few minutes. Videos are deleted automatically after 1 to 30 days depending on your plan, and you can delete them, or your whole account, any time from the Your videos page. They're never used to train models." },
-  { q: "What do I get for free?", a: "Three previews a day as a guest, each showing the first 5 seconds cleaned. Full-length exports are on the paid plans." },
+  { q: "What does it cost?", a: "Nothing while Cleanup is in testing, and no account is needed. You get videos up to 30 minutes, 100 previews and 50 full exports a day, in up to 4K (never above your video's own resolution), with the original sound." },
 ];
 
 export default function Home() {

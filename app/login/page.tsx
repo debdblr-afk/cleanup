@@ -12,7 +12,6 @@ function LoginForm() {
   useStore();
   const params = useSearchParams();
   const next = safeNext(params.get("next"), "/account");
-  const checkout = next.startsWith("/pricing");
   const emailId = useId();
   const errId = useId();
   const [email, setEmail] = useState("");
@@ -81,9 +80,9 @@ function LoginForm() {
 
   return (
     <div className="mx-auto max-w-sm px-4 py-16 space-y-4">
-      <h1 className="text-xl">{checkout ? "Sign in to choose a plan" : guest ? "Save your work" : "Sign in"}</h1>
+      <h1 className="text-xl">{guest ? "Save your work" : "Sign in"}</h1>
       <p className="text-sm text-text-muted">
-        {checkout ? "Plans are tied to an account so you can manage or cancel them any time." : guest ? "Add your email to keep your batches. Everything you've added as a guest stays where it is." : "We'll email you a link. No password needed."}
+        {guest ? "Add your email to keep your batches. Everything you've added as a guest stays where it is." : "We'll email you a link. No password needed."}
       </p>
       {googleOn && (
         <>

@@ -3,8 +3,7 @@
 // Creates two throwaway users with random passwords, exercises every route, checks that
 // user B can see or touch nothing of user A's, then deletes both users.
 import { createClient } from "@supabase/supabase-js";
-import Stripe from "stripe";
-import { createHmac, randomBytes, randomUUID } from "node:crypto";
+import { createHmac, randomBytes } from "node:crypto";
 
 const BASE = process.env.BASE ?? "http://localhost:5320";
 const URL_ = process.env.NEXT_PUBLIC_SUPABASE_URL;
@@ -37,6 +36,12 @@ const call = (user, method, path, body, headers = {}) =>
 
 const tinyVideo = new Uint8Array(randomBytes(2048)); // bytes only; the server never decodes it
 const usage = async (uid, kind) => (await admin.from("usage_daily").select("count").eq("user_id", uid).eq("kind", kind).maybeSingle()).data?.count ?? 0;
+
+// A running export worker would claim this script's exports before the checks can.
+if (await fetch("http://localhost:5399").then(() => true).catch(() => false)) {
+  console.error("An export worker is running (port 5399). Stop it while this script runs; it claims the test's exports.");
+  process.exit(2);
+}
 
 const A = await makeUser("alice");
 const B = await makeUser("bob");
@@ -128,17 +133,14 @@ try {
   check("cancel -> canceled", (await call(A, "POST", `/api/jobs/${j2.json.job.id}/cancel`)).json?.job?.status === "canceled");
   check("cancel gave the preview back", (await usage(A.id, "preview")) === before);
   check("retry canceled job", (await call(A, "POST", `/api/jobs/${j2.json.job.id}/retry`)).status === 201);
-  let capHit = null;
-  for (let i = 0; i < 10 && !capHit; i++) {
-    const r = await call(A, "POST", `/api/videos/${video.id}/jobs`, { autoDetect: true });
-    if (r.status === 429) capHit = r;
-  }
-  check("free plan stops at 5 previews a day", capHit?.json?.error?.code === "daily_cap" && (await usage(A.id, "preview")) === 5);
+  // Everyone has the Pro limits: 100 previews a day. Jump close to the cap instead of making 100 jobs.
+  await admin.from("usage_daily").update({ count: 99 }).eq("user_id", A.id).eq("kind", "preview");
+  const last = await call(A, "POST", `/api/videos/${video.id}/jobs`, { autoDetect: true });
+  const capHit = await call(A, "POST", `/api/videos/${video.id}/jobs`, { autoDetect: true });
+  check("everyone stops at 100 previews a day", last.status === 201 && capHit.json?.error?.code === "daily_cap" && (await usage(A.id, "preview")) === 100, JSON.stringify(capHit.json));
 
   console.log("\nexports");
-  check("free plan -> 402 upgrade", (await call(A, "POST", `/api/jobs/${job1.id}/exports`, { resolution: "720p" })).status === 402);
-  await admin.from("profiles").update({ plan: "plus" }).eq("id", A.id);
-  check("above plan (4K on Plus) -> 402", (await call(A, "POST", `/api/jobs/${job1.id}/exports`, { resolution: "2160p" })).status === 402);
+  check("4K from a 360p source -> 400 (never above the source)", (await call(A, "POST", `/api/jobs/${job1.id}/exports`, { resolution: "2160p" })).status === 400);
   check("above source (1080p from 360p) -> 400", (await call(A, "POST", `/api/jobs/${job1.id}/exports`, { resolution: "1080p" })).status === 400);
   const e1 = await call(A, "POST", `/api/jobs/${job1.id}/exports`, { resolution: "720p" });
   check("export 720p -> queued", e1.status === 201 && e1.json.export.status === "queued");
@@ -218,40 +220,6 @@ try {
     const file = await fetch(`${BASE}/api/files?kind=result&id=${mine.export.id}`, { headers: { authorization: `Bearer ${A.token}` }, redirect: "manual" });
     check("owner can fetch the MP4", file.status === 302 || file.status === 307, String(file.status));
   }
-
-  console.log("\nstripe webhook");
-  const secret = process.env.STRIPE_WEBHOOK_SECRET;
-  const stripe = new Stripe("unused");
-  const now = Math.floor(Date.now() / 1000);
-  const sub = (status, extra = {}) => ({
-    id: "sub_test_" + A.id.slice(0, 8), object: "subscription", customer: "cus_test_" + A.id.slice(0, 8), status, cancel_at_period_end: false,
-    metadata: { user_id: A.id },
-    items: { object: "list", data: [{ id: "si_1", current_period_end: now + 30 * 86400, price: { id: process.env.STRIPE_PRICE_PRO_MONTH, unit_amount: 3200, currency: "usd", recurring: { interval: "month" } } }] },
-    ...extra,
-  });
-  const send = async (event, sig) => {
-    const payload = JSON.stringify(event);
-    const header = sig ?? stripe.webhooks.generateTestHeaderString({ payload, secret });
-    return fetch(BASE + "/api/webhooks/stripe", { method: "POST", headers: { "stripe-signature": header, "content-type": "application/json" }, body: payload })
-      .then(async (r) => ({ status: r.status, json: await r.json().catch(() => null) }));
-  };
-  const plan = async () => (await admin.from("profiles").select("plan").eq("id", A.id).single()).data.plan;
-  const evt = (id, type, created, obj) => ({ id, object: "event", type, created, data: { object: obj }, livemode: false, api_version: "2025-01-01" });
-  check("bad signature -> 400", (await send(evt("evt_bad", "customer.subscription.created", now, sub("active")), "t=1,v1=deadbeef")).status === 400);
-  const created = evt(`evt_${randomUUID()}`, "customer.subscription.created", now, sub("active"));
-  const r1 = await send(created);
-  check("subscription.created -> Pro", r1.status === 200 && r1.json.outcome === "applied" && (await plan()) === "pro", JSON.stringify(r1.json));
-  check("same event again -> duplicate, no change", (await send(created)).json?.duplicate === true);
-  const old = await send(evt(`evt_${randomUUID()}`, "customer.subscription.updated", now - 300, sub("canceled")));
-  check("older event out of order -> ignored", old.json?.outcome === "stale" && (await plan()) === "pro");
-  const pastDue = await send(evt(`evt_${randomUUID()}`, "customer.subscription.updated", now + 10, sub("past_due")));
-  check("past_due keeps the plan during retries", pastDue.json?.outcome === "applied" && (await plan()) === "pro");
-  await send(evt(`evt_${randomUUID()}`, "customer.subscription.deleted", now + 20, sub("canceled")));
-  check("subscription.deleted -> back to Free", (await plan()) === "free");
-  const cs = await send(evt(`evt_${randomUUID()}`, "checkout.session.completed", now + 30, { id: "cs_1", object: "checkout.session", client_reference_id: B.id, customer: "cus_bob" }));
-  const bCust = (await admin.from("profiles").select("stripe_customer_id").eq("id", B.id).single()).data.stripe_customer_id;
-  check("checkout.session.completed links the customer", cs.json?.outcome === "linked" && bCust === "cus_bob");
-  check("checkout without Stripe key -> 503", (await call(A, "POST", "/api/billing/checkout", { plan: "plus", interval: "month" })).status === 503);
 
   console.log("\nexpiry + account deletion");
   await admin.from("videos").update({ expires_at: new Date(Date.now() - 1000).toISOString() }).eq("id", video.id);

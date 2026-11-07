@@ -96,5 +96,4 @@ export type Profile = {
   email: string | null;
   isAnonymous: boolean;
   plan: "free" | "plus" | "pro";
-  hasBilling: boolean;
 };

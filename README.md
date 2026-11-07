@@ -20,7 +20,7 @@ npm run dev               # or the "cleanup" entry in ../.claude/launch.json (po
 
 ```bash
 npm test                  # unit: quota, masks, plans, the fill and the detector
-npm run test:api          # end to end against the dev server: every route, access rules with two users, Stripe webhooks, crons
+npm run test:api          # end to end against the dev server: every route, access rules with two users, the worker, crons
 npm run e2e               # Playwright: every flow in a real browser, with axe, console and 5xx checks (report in e2e/.report)
 ```
 
@@ -45,5 +45,5 @@ npm run worker            # needs WORKER_SECRET and APP_URL in .env.local, same 
 - **Reads:** row level security plus Supabase Realtime. **Writes:** `app/api/*`, with ownership, plan limits and daily caps checked on the server.
 - **Files:** a private Supabase Storage bucket, reached only through 10-minute signed URLs (`lib/server/storage.ts`, the one file to change for R2).
 - **Work queue:** `removal_jobs` and `exports`. Previews are claimed by the open tab (`claim_work()`, `lib/engine/`); exports by the server worker (`claim_export_any()`, `worker/`).
-- **Payments:** Stripe Checkout, the Customer Portal and the webhook (test mode). Leave `STRIPE_SECRET_KEY` empty and checkout answers "payments aren't set up".
+- **Plans:** none. Everyone, guests included, gets the Pro limits (`DEFAULT_PLAN` in `lib/plans.ts`). The Stripe code was removed and is in git history.
 - **Crons** (`vercel.json`): `/api/cron/expire` hourly, `/api/cron/sweep` every 5 minutes, both behind `CRON_SECRET`.

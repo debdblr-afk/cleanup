@@ -16,11 +16,11 @@ const PAGES: Record<string, { title: string; body: string[] }> = {
   privacy: {
     title: "Privacy (draft)",
     body: [
-      "Your videos are stored privately and only reachable through short-lived links made for you. They're deleted when your plan's retention ends (1 to 30 days), and never used to train models.",
-      "Cleaning currently runs in your own browser tab; your videos are uploaded only so you can come back to them and download results.",
-      "Processors we use: Supabase (database, sign-in, file storage), Stripe (payments; we never see card numbers), Resend (email), and our hosting provider, which also runs the servers that render your exports. A GPU processing provider will be added and listed here before it's used.",
+      "Your videos are stored privately and only reachable through short-lived links made for you. They're deleted automatically after 30 days, and never used to train models.",
+      "Previews are cleaned in your own browser tab. Full exports are made in your tab or on our export servers. Your videos are uploaded so you can come back to them and download results.",
+      "Processors we use: Supabase (database, sign-in, file storage), Resend (email), and our hosting provider, which also runs the servers that render your exports. A GPU processing provider will be added and listed here before it's used.",
       "We record the date you confirmed you have the rights to each video. We don't sell data or use ad trackers.",
-      "Delete your account at any time from the Your videos page: every file, record and subscription goes with it.",
+      "Delete your account at any time from the Your videos page: every file and record goes with it.",
     ],
   },
   takedown: {

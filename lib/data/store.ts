@@ -208,15 +208,9 @@ function listen(userId: string) {
 // ---------------------------------------------------------------------------
 
 export function getPlan(): Plan {
-  return PLANS[planIdFor(state.profile)];
+  return PLANS[planIdFor()];
 }
 
-/** Development only: the server refuses unless ALLOW_DEMO_PLAN=1 outside production. */
-export async function setDemoPlan(id: "free" | "plus" | "pro") {
-  await ensureSession();
-  await api("/api/dev/plan", { body: { plan: id } });
-  await refreshProfile();
-}
 
 export function quotaStatus() {
   const plan = getPlan();

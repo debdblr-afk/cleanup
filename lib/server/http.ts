@@ -2,7 +2,7 @@ import "server-only";
 import type { User } from "@supabase/supabase-js";
 import { NextResponse } from "next/server";
 import type { z } from "zod";
-import { planIdFor, toProfile } from "@/lib/rows";
+import { planIdFor } from "@/lib/rows";
 import { PLANS, type Plan } from "@/lib/plans";
 import { currentUser, supabaseAdmin } from "@/lib/supabase/server";
 
@@ -30,9 +30,10 @@ export async function requireUser(): Promise<User | Response> {
   return user ?? fail(401, "unauthenticated", "Sign in or start a guest session first.");
 }
 
+/** The limits that apply to this user. Everyone has the same plan for now (DEFAULT_PLAN). */
 export async function planOf(userId: string): Promise<Plan> {
-  const { data } = await supabaseAdmin().from("profiles").select("*").eq("id", userId).single();
-  return PLANS[planIdFor(data ? toProfile(data) : null)];
+  void userId; // kept so per-user limits can come back without touching the routes
+  return PLANS[planIdFor()];
 }
 
 export const db = () => supabaseAdmin();

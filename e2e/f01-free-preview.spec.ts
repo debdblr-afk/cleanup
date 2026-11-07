@@ -50,14 +50,13 @@ test.describe("F01 guest cleans a video and grabs the free preview", () => {
     await expect(page.getByRole("alert").filter({ hasText: "couldn't be opened" })).toBeVisible();
   });
 
-  test("F01-N4 a video over the plan's length is refused with the plan that takes it", async ({ page }) => {
+  test("F01-H3 a video over a minute is accepted: everyone gets up to 30 minutes", async ({ page }) => {
     await page.goto("/");
     await attestBox(page).check();
     await uploadFiles(page, ["long-62s.webm"]);
-    const alert = page.getByRole("alert").filter({ hasText: "long-62s.webm" });
-    await expect(alert).toContainText("is longer than 1:00, the limit on your plan");
-    await expect(alert).toContainText("Free takes videos up to 2:00");
-    expect(page.url()).not.toMatch(/\/b\//);
+    await page.waitForURL(/\/b\//);
+    await expect(card(page, "long-62s.webm")).toContainText("1:02");
+    await waitPreviewReady(page, "long-62s.webm");
   });
 
   test("F01-E1 a second visitor can't see the batch or its files", async ({ page, browser }) => {
@@ -147,18 +146,6 @@ test.describe("F01 guest cleans a video and grabs the free preview", () => {
     await waitPreviewReady(page, long);
     await noHorizontalScroll(page);
     await axe(page);
-  });
-
-  test("F01-E5 the daily cap: a guest's 4th video waits for tomorrow", async ({ page }, info) => {
-    const names = ["one.webm", "two.webm", "three.webm", "four.webm"].map((n) => { const p = info.outputPath(n); copyFileSync(fixture("clip-a.webm"), p); return p; });
-    await page.goto("/");
-    await attestBox(page).check();
-    await page.locator('input[type="file"]').first().setInputFiles(names);
-    await page.waitForURL(/\/b\//);
-    await expect(page.getByRole("article")).toHaveCount(4);
-    for (const n of ["one.webm", "two.webm", "three.webm"]) await waitPreviewReady(page, n);
-    await expect(card(page, "four.webm")).toContainText("No previews left today");
-    await expect(card(page, "four.webm").getByRole("button", { name: "Clean it" })).toHaveCount(0);
   });
 
   test("F01-E6 keyboard only: tick the box and start the sample", async ({ page }) => {
