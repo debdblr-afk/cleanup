@@ -7,7 +7,9 @@ export const uuid = z.string().uuid();
 const region = z.object({
   id: z.string().min(1).max(64),
   kind: z.enum(["erase", "protect"]),
-  shape: z.literal("rect"),
+  shape: z.enum(["rect", "brush"]).default("rect"),
+  points: z.array(z.object({ x: z.number().min(0).max(1), y: z.number().min(0).max(1) })).min(1).max(600).optional(),
+  size: z.number().min(0.002).max(0.5).optional(),
   x: z.number().min(0).max(1), y: z.number().min(0).max(1),
   w: z.number().min(0.005).max(1), h: z.number().min(0.005).max(1),
   tStartMs: z.number().int().min(0),
@@ -15,7 +17,8 @@ const region = z.object({
   track: z.boolean(),
   source: z.enum(["user", "auto"]),
 }).refine((r) => r.x + r.w <= 1.0001 && r.y + r.h <= 1.0001, "Zone must stay inside the frame")
-  .refine((r) => r.tEndMs == null || r.tEndMs >= r.tStartMs, "Zone ends before it starts");
+  .refine((r) => r.tEndMs == null || r.tEndMs >= r.tStartMs, "Zone ends before it starts")
+  .refine((r) => r.shape !== "brush" || (r.points && r.size), "A brush zone needs its stroke");
 
 export const mask = z.object({ regions: z.array(region).max(50) });
 

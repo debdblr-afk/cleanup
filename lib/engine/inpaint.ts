@@ -78,3 +78,58 @@ export function fillRect(
     }
   }
 }
+
+/**
+ * Fill any shape (a brush stroke): `bits` marks the pixels to replace. Each one starts as an
+ * inverse-distance blend of the nearest unmasked pixel left, right, above and below it, then
+ * a few rounds of neighbour averaging smooth the seams. Pure, like fillRect.
+ */
+export function fillMask(data: Uint8ClampedArray, width: number, height: number, bits: Uint8Array, rounds = 24): void {
+  const n = width * height;
+  let count = 0;
+  for (let i = 0; i < n; i++) count += bits[i];
+  if (!count || count === n) return;
+  const idx = new Int32Array(count);
+  for (let i = 0, k = 0; i < n; i++) if (bits[i]) idx[k++] = i;
+
+  // Start: nearest unmasked pixel in each of the four directions.
+  const start = new Float32Array(count * 3);
+  for (let k = 0; k < count; k++) {
+    const i = idx[k], x = i % width, y = (i / width) | 0;
+    let r = 0, g = 0, b = 0, wsum = 0;
+    const look = (dx: number, dy: number) => {
+      for (let d = 1, sx = x + dx, sy = y + dy; sx >= 0 && sy >= 0 && sx < width && sy < height; d++, sx += dx, sy += dy) {
+        const j = sy * width + sx;
+        if (bits[j]) continue;
+        const w = 1 / (d * d), p = j * 4;
+        r += data[p] * w; g += data[p + 1] * w; b += data[p + 2] * w; wsum += w;
+        return;
+      }
+    };
+    look(-1, 0); look(1, 0); look(0, -1); look(0, 1);
+    if (wsum) { start[k * 3] = r / wsum; start[k * 3 + 1] = g / wsum; start[k * 3 + 2] = b / wsum; }
+  }
+  for (let k = 0; k < count; k++) {
+    const p = idx[k] * 4;
+    data[p] = start[k * 3]; data[p + 1] = start[k * 3 + 1]; data[p + 2] = start[k * 3 + 2];
+  }
+
+  // Smooth: each masked pixel becomes the average of its four neighbours.
+  const next = new Float32Array(count * 3);
+  for (let round = 0; round < rounds; round++) {
+    for (let k = 0; k < count; k++) {
+      const i = idx[k], x = i % width, y = (i / width) | 0;
+      let r = 0, g = 0, b = 0, m = 0;
+      const add = (j: number) => { const p = j * 4; r += data[p]; g += data[p + 1]; b += data[p + 2]; m++; };
+      if (x > 0) add(i - 1);
+      if (x < width - 1) add(i + 1);
+      if (y > 0) add(i - width);
+      if (y < height - 1) add(i + width);
+      next[k * 3] = r / m; next[k * 3 + 1] = g / m; next[k * 3 + 2] = b / m;
+    }
+    for (let k = 0; k < count; k++) {
+      const p = idx[k] * 4;
+      data[p] = next[k * 3]; data[p + 1] = next[k * 3 + 1]; data[p + 2] = next[k * 3 + 2];
+    }
+  }
+}

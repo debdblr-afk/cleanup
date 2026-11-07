@@ -75,4 +75,43 @@ test.describe("F03 fix a missed watermark by hand", () => {
     await expect(page.getByText(/Draw at least one erase box/)).toBeVisible();
     await expect(page.getByRole("button", { name: "Clean again" })).toBeDisabled();
   });
+
+  test("F03-H2 paint over a mark with the brush, clean again, version 2 is done", async ({ page }) => {
+    await openEditor(page);
+    await stage(page).focus();
+    await page.keyboard.press("p");
+    await expect(page.getByRole("button", { name: /Brush/ })).toHaveAttribute("aria-pressed", "true");
+    await page.getByRole("button", { name: "Large brush" }).click();
+    const box = (await stage(page).boundingBox())!;
+    await page.mouse.move(box.x + box.width * 0.3, box.y + box.height * 0.5);
+    await page.mouse.down();
+    for (let i = 1; i <= 10; i++) await page.mouse.move(box.x + box.width * (0.3 + i * 0.03), box.y + box.height * (0.5 + Math.sin(i) * 0.05));
+    await page.mouse.up();
+    const zones = page.locator("section[aria-labelledby=zones-h]");
+    await expect(zones.getByText("Erase brush")).toBeVisible();
+    // Arrow keys move the stroke; undo puts it back.
+    const before = await page.locator("svg g[data-region] path").first().getAttribute("d");
+    await page.keyboard.press("ArrowDown");
+    await expect(page.locator("svg g[data-region] path").first()).not.toHaveAttribute("d", before!);
+    await page.keyboard.press("ControlOrMeta+z");
+    await expect(page.locator("svg g[data-region] path").first()).toHaveAttribute("d", before!);
+    await page.getByRole("button", { name: "Clean again" }).click();
+    const versions = page.locator("section[aria-labelledby=versions-h]");
+    await expect(versions.getByText(/Version 2 · \d+ zones?/)).toBeVisible();
+    await expect(versions.getByRole("listitem").first().getByRole("button", { name: "Compare" })).toBeVisible({ timeout: 90_000 });
+    await axe(page);
+  });
+
+  test("F03-E3 a keep brush is listed as keep, and the brush works by drag only after switching back to box", async ({ page }) => {
+    await openEditor(page);
+    await page.getByRole("button", { name: /Brush/ }).click();
+    await page.getByRole("button", { name: /Keep/ }).click();
+    await drawBox(page, [0.2, 0.7], [0.3, 0.75]);
+    const zones = page.locator("section[aria-labelledby=zones-h]");
+    await expect(zones.getByText("Keep brush")).toBeVisible();
+    await page.getByRole("button", { name: /^Box/ }).click();
+    await page.getByRole("button", { name: /Erase/ }).first().click();
+    await drawBox(page, [0.6, 0.2], [0.7, 0.3]);
+    await expect(zones.getByText("Erase box")).toBeVisible();
+  });
 });

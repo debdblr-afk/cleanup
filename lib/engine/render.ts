@@ -3,9 +3,9 @@
 // worker's render(preview | full); same inputs (video, mask, limits) and output (a file).
 // Audio is not carried over here; the worker re-muxes the original audio.
 
-import { activeAt, toPixels } from "../mask";
+import { activeAt, rasterizeBrush, toPixels } from "../mask";
 import type { Mask } from "../types";
-import { fillRect } from "./inpaint";
+import { fillMask, fillRect } from "./inpaint";
 import { disposeVideo, loadVideo, pickRecorderType } from "./video";
 
 export type RenderOptions = {
@@ -57,6 +57,7 @@ export async function render(source: Blob, mask: Mask, opts: RenderOptions): Pro
         ? (x: number, y: number) => keep.some((k) => x >= k.x0 && x < k.x1 && y >= k.y0 && y < k.y1)
         : undefined;
       for (const r of active) {
+        if (r.shape === "brush") { fillBrush(r); continue; }
         const px = toPixels(r, width, height);
         // Read a margin around the box so fillRect can sample the pixels just outside it.
         const m = 4;
@@ -71,6 +72,27 @@ export async function render(source: Blob, mask: Mask, opts: RenderOptions): Pro
         ctx.putImageData(img, sx, sy);
       }
     };
+
+    // A brush stroke: fill exactly the painted pixels (minus keep areas) inside its box.
+    function fillBrush(r: (typeof erase)[number]) {
+      const tMs = video!.currentTime * 1000;
+      const keep = protect.filter((k) => activeAt(k, tMs)).map((k) => toPixels(k, width, height));
+      const { bits, x0, y0, x1, y1 } = rasterizeBrush(r, width, height);
+      const m = 4;
+      const sx = Math.max(0, x0 - m), sy = Math.max(0, y0 - m);
+      const sw = Math.min(width, x1 + m) - sx, sh = Math.min(height, y1 + m) - sy;
+      if (sw <= 0 || sh <= 0) return;
+      const local = new Uint8Array(sw * sh);
+      const bw = x1 - x0;
+      for (let y = y0; y < y1; y++) for (let x = x0; x < x1; x++) {
+        if (!bits[(y - y0) * bw + (x - x0)]) continue;
+        if (keep.some((k) => x >= k.x0 && x < k.x1 && y >= k.y0 && y < k.y1)) continue;
+        local[(y - sy) * sw + (x - sx)] = 1;
+      }
+      const img = ctx.getImageData(sx, sy, sw, sh);
+      fillMask(img.data, sw, sh, local);
+      ctx.putImageData(img, sx, sy);
+    }
 
     // First frame before recording starts, so the file doesn't open on black.
     drawFrame();

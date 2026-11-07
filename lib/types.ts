@@ -4,11 +4,17 @@
 export type PlanId = "guest" | "free" | "plus" | "pro";
 export type RemovalMode = "watermark" | "subtitle" | "text" | "object" | "person";
 
-/** One zone on the frame. Coordinates are 0..1 of the frame, so they survive any resize. */
+/**
+ * One zone on the frame. Coordinates are 0..1 of the frame, so they survive any resize.
+ * A brush zone also carries its stroke: points (0..1) and the brush diameter as a fraction
+ * of the frame's width. x/y/w/h is then the stroke's bounding box.
+ */
 export type Region = {
   id: string;
   kind: "erase" | "protect";
-  shape: "rect";
+  shape: "rect" | "brush";
+  points?: { x: number; y: number }[];
+  size?: number;
   x: number;
   y: number;
   w: number;

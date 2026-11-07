@@ -10,14 +10,23 @@ import { toast } from "@/components/ui/toast";
 import { useFileUrl, useStore } from "@/lib/data/hooks";
 import { cancelJob, createJob, effectiveMask, jobsFor } from "@/lib/data/store";
 import { formatClock, formatDuration, timeAgo, uid } from "@/lib/format";
-import { describeRegion, hasErase, MIN_REGION, normalizeRegion } from "@/lib/mask";
+import { brushRegion, describeRegion, hasErase, MIN_REGION, moveRegion, normalizeRegion } from "@/lib/mask";
 import { PREVIEW_MS } from "@/lib/plans";
 import type { Job, Mask, Region, RemovalMode, Video } from "@/lib/types";
 
 type Drag =
   | { kind: "draw"; x0: number; y0: number; id: string }
+  | { kind: "paint"; id: string; points: { x: number; y: number }[] }
   | { kind: "move"; id: string; dx: number; dy: number; start: Region }
   | { kind: "resize"; id: string; start: Region };
+
+// Brush diameters as a fraction of the frame's width.
+const BRUSH_SIZES = [
+  { id: "S", label: "Small brush", value: 0.015 },
+  { id: "M", label: "Medium brush", value: 0.03 },
+  { id: "L", label: "Large brush", value: 0.06 },
+] as const;
+const MAX_STROKE_POINTS = 600;
 
 const MODES: { id: RemovalMode; label: string; ready: boolean }[] = [
   { id: "watermark", label: "Watermark or logo", ready: true },
@@ -56,6 +65,8 @@ export function Editor({ video }: { video: Video }) {
   }, [latestDetected]);
 
   const [zone, setZone] = useState<Region["kind"]>("erase");
+  const [tool, setTool] = useState<"box" | "brush">("box");
+  const [brushSize, setBrushSize] = useState<number>(BRUSH_SIZES[1].value);
   const [selected, setSelected] = useState<string | null>(null);
   const [mode, setMode] = useState<RemovalMode>("watermark");
   const [autoDetect, setAutoDetect] = useState(false);
@@ -105,7 +116,16 @@ export function Editor({ video }: { video: Video }) {
   };
 
   const updateRegion = (id: string, patch: Partial<Region>, commit: boolean) => {
-    const next = { regions: mask.regions.map((r) => (r.id === id ? normalizeRegion({ ...r, ...patch }) : r)) };
+    const apply = (r: Region) => {
+      // A brush stroke moves with its box; its size comes from the stroke, not from resizing.
+      if (r.shape === "brush") {
+        const { x, y, ...rest } = patch;
+        const moved = x != null || y != null ? moveRegion(r, x ?? r.x, y ?? r.y) : r;
+        return { ...moved, ...rest, w: moved.w, h: moved.h };
+      }
+      return normalizeRegion({ ...r, ...patch });
+    };
+    const next = { regions: mask.regions.map((r) => (r.id === id ? apply(r) : r)) };
     if (commit) hist.push(next); else hist.replace(next);
   };
 
@@ -120,11 +140,16 @@ export function Editor({ video }: { video: Video }) {
       const r = mask.regions.find((x) => x.id === id)!;
       setSelected(id);
       hist.push(mask); // snapshot so the whole move is one undo step
-      drag.current = handle ? { kind: "resize", id, start: r } : { kind: "move", id, dx: p.x - r.x, dy: p.y - r.y, start: r };
+      drag.current = handle && r.shape !== "brush" ? { kind: "resize", id, start: r } : { kind: "move", id, dx: p.x - r.x, dy: p.y - r.y, start: r };
       return;
     }
     setSelected(null);
     const id = uid();
+    if (tool === "brush") {
+      drag.current = { kind: "paint", id, points: [p] };
+      setDraft(brushRegion({ id, kind: zone, points: [p], size: brushSize, ratio }));
+      return;
+    }
     drag.current = { kind: "draw", x0: p.x, y0: p.y, id };
     setDraft({ id, kind: zone, shape: "rect", x: p.x, y: p.y, w: 0, h: 0, tStartMs: 0, tEndMs: null, track: false, source: "user" });
   };
@@ -134,6 +159,13 @@ export function Editor({ video }: { video: Video }) {
     if (!d) return;
     const p = point(e);
     if (d.kind === "draw") setDraft((r) => (r ? { ...r, x: d.x0, y: d.y0, w: p.x - d.x0, h: p.y - d.y0 } : r));
+    else if (d.kind === "paint") {
+      // Keep a point only when the pointer has moved a quarter of the brush, so strokes stay small.
+      const last = d.points[d.points.length - 1];
+      if (d.points.length >= MAX_STROKE_POINTS || Math.hypot(p.x - last.x, (p.y - last.y) / ratio) < brushSize / 4) return;
+      d.points.push(p);
+      setDraft(brushRegion({ id: d.id, kind: zone, points: d.points, size: brushSize, ratio }));
+    }
     else if (d.kind === "move") updateRegion(d.id, { x: p.x - d.dx, y: p.y - d.dy }, false);
     else updateRegion(d.id, { w: Math.max(MIN_REGION, p.x - d.start.x), h: Math.max(MIN_REGION, p.y - d.start.y) }, false);
   };
@@ -141,6 +173,12 @@ export function Editor({ video }: { video: Video }) {
   const onStageUp = () => {
     const d = drag.current;
     drag.current = null;
+    if (d?.kind === "paint" && draft) {
+      hist.push({ regions: [...mask.regions, draft] });
+      setSelected(draft.id);
+      setDraft(null);
+      return;
+    }
     if (d?.kind === "draw" && draft) {
       if (Math.abs(draft.w) >= MIN_REGION && Math.abs(draft.h) >= MIN_REGION) {
         const r = normalizeRegion(draft);
@@ -163,6 +201,8 @@ export function Editor({ video }: { video: Video }) {
     if (mod && e.key.toLowerCase() === "z") { e.preventDefault(); if (e.shiftKey) hist.redo(); else hist.undo(); return; }
     if (mod) return;
     if (e.key === "e" || e.key === "E") setZone("erase");
+    else if (e.key === "b" || e.key === "B") setTool("box");
+    else if (e.key === "p" || e.key === "P") setTool("brush");
     else if (e.key === "k" || e.key === "K") setZone("protect");
     else if (e.key === " " && (e.target as HTMLElement).getAttribute("role") !== "button" && tag !== "BUTTON") { e.preventDefault(); togglePlay(); }
     else if (selected && (e.key === "Delete" || e.key === "Backspace")) { e.preventDefault(); removeRegion(selected); }
@@ -193,7 +233,7 @@ export function Editor({ video }: { video: Video }) {
     else toast("This video isn't ready yet.", "error");
   };
 
-  const regionsShown = draft ? [...mask.regions, normalizeRegion(draft)] : mask.regions;
+  const regionsShown = draft ? [...mask.regions, draft.shape === "brush" ? draft : normalizeRegion(draft)] : mask.regions;
   const previewEnd = useMemo(() => (duration ? Math.min(1, PREVIEW_MS / 1000 / duration) : 0), [duration]);
 
   return (
@@ -209,9 +249,17 @@ export function Editor({ video }: { video: Video }) {
           {view === "edit" ? (
             <div role="toolbar" aria-label="Zone tools" className="h-12 px-3 flex items-center gap-2 border-b border-canvas-raised overflow-x-auto">
               <div className="flex rounded-md bg-canvas-raised p-0.5 shrink-0" role="group" aria-label="Shape">
-                <button type="button" aria-pressed="true" className="h-8 px-3 rounded-sm bg-accent text-on-accent text-sm inline-flex items-center gap-1"><SquareDashed className="size-4" aria-hidden />Box</button>
-                <button type="button" disabled title="Brush comes with the GPU engine" className="h-8 px-3 rounded-sm text-sm inline-flex items-center gap-1 text-canvas-muted opacity-60"><Brush className="size-4" aria-hidden />Brush</button>
+                <button type="button" aria-pressed={tool === "box"} onClick={() => setTool("box")} title="Box (B)" className={`h-8 px-3 rounded-sm text-sm inline-flex items-center gap-1 ${tool === "box" ? "bg-accent text-on-accent" : "hover:bg-canvas"}`}><SquareDashed className="size-4" aria-hidden />Box</button>
+                <button type="button" aria-pressed={tool === "brush"} onClick={() => setTool("brush")} title="Brush (P)" className={`h-8 px-3 rounded-sm text-sm inline-flex items-center gap-1 ${tool === "brush" ? "bg-accent text-on-accent" : "hover:bg-canvas"}`}><Brush className="size-4" aria-hidden />Brush</button>
               </div>
+              {tool === "brush" && (
+                <div className="flex rounded-md bg-canvas-raised p-0.5 shrink-0" role="group" aria-label="Brush size">
+                  {BRUSH_SIZES.map((b) => (
+                    <button key={b.id} type="button" aria-pressed={brushSize === b.value} aria-label={b.label} title={b.label} onClick={() => setBrushSize(b.value)}
+                      className={`h-8 w-8 rounded-sm text-sm grid place-items-center ${brushSize === b.value ? "bg-on-canvas text-canvas" : "hover:bg-canvas"}`}>{b.id}</button>
+                  ))}
+                </div>
+              )}
               <div className="flex rounded-md bg-canvas-raised p-0.5 shrink-0" role="group" aria-label="Zone type">
                 <button type="button" aria-pressed={zone === "erase"} onClick={() => setZone("erase")} title="Erase (E)" className={`h-8 px-3 rounded-sm text-sm inline-flex items-center gap-1.5 ${zone === "erase" ? "bg-on-canvas text-canvas" : "hover:bg-canvas"}`}>
                   <span className="size-2.5 rounded-sm bg-mask-erase" aria-hidden />Erase
@@ -253,7 +301,22 @@ export function Editor({ video }: { video: Video }) {
                     onPlay={() => setPlaying(true)} onPause={() => setPlaying(false)}
                   />
                 )}
-                {regionsShown.map((r) => {
+                <svg className="absolute inset-0 size-full pointer-events-none" viewBox={`0 0 ${ratio} 1`} preserveAspectRatio="none" aria-hidden>
+                  {regionsShown.filter((r) => r.shape === "brush" && r.points?.length).map((r) => {
+                    const active = t * 1000 >= r.tStartMs && (r.tEndMs == null || t * 1000 <= r.tEndMs);
+                    const d = r.points!.map((p, i) => `${i ? "L" : "M"}${p.x * ratio} ${p.y}${r.points!.length === 1 ? ` L${p.x * ratio} ${p.y}` : ""}`).join(" ");
+                    return (
+                      <g key={r.id} data-region={r.id} className={`cursor-move ${active ? "" : "opacity-35"}`}>
+                        <path d={d} fill="none" strokeLinecap="round" strokeLinejoin="round" strokeWidth={(r.size ?? 0.03) * ratio} pointerEvents="stroke"
+                          className={r.kind === "erase" ? "stroke-mask-erase-fill" : "stroke-mask-protect-fill"} />
+                        {r.id === selected && (
+                          <rect x={r.x * ratio} y={r.y} width={r.w * ratio} height={r.h} fill="none" strokeWidth={0.004} strokeDasharray="0.01 0.008" className="stroke-on-canvas" />
+                        )}
+                      </g>
+                    );
+                  })}
+                </svg>
+                {regionsShown.filter((r) => r.shape !== "brush").map((r) => {
                   const active = t * 1000 >= r.tStartMs && (r.tEndMs == null || t * 1000 <= r.tEndMs);
                   const isSel = r.id === selected;
                   return (
@@ -315,7 +378,7 @@ export function Editor({ video }: { video: Video }) {
           <section aria-labelledby="zones-h">
             <h2 id="zones-h" className="text-xs font-medium text-text-muted mb-2">Zones</h2>
             {mask.regions.length === 0 ? (
-              <p className="text-text-muted">No zones yet. Drag over the video to draw an erase box.</p>
+              <p className="text-text-muted">No zones yet. Drag over the video to draw a box, or switch to Brush and paint over the mark.</p>
             ) : (
               <ul className="space-y-1">
                 {mask.regions.map((r) => (
@@ -355,7 +418,7 @@ export function Editor({ video }: { video: Video }) {
               <Button size="sm" onClick={() => setExportOpen(true)}>Export</Button>
             </div>
           )}
-          <p className="text-xs text-text-muted">Shortcuts: E erase, K keep, Space play, arrows move a zone, Delete removes it, ⌘Z undo.</p>
+          <p className="text-xs text-text-muted">Shortcuts: B box, P brush, E erase, K keep, Space play, arrows move a zone, Delete removes it, ⌘Z undo.</p>
         </aside>
       </div>
 
