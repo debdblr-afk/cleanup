@@ -67,11 +67,13 @@ export async function waitPreviewReady(page: Page, filename: string | RegExp) {
 export const MAILPIT = "http://127.0.0.1:55324";
 
 export async function latestLinkFor(email: string): Promise<string> {
+  // Only an email sent to exactly this address counts: Mailpit's search is loose, and an older
+  // message to a similar test address carries a link that was already used.
   for (let i = 0; i < 30; i++) {
-    const list = await (await fetch(`${MAILPIT}/api/v1/search?query=${encodeURIComponent(`to:${email}`)}&limit=1`)).json();
-    const id = list.messages?.[0]?.ID;
-    if (id) {
-      const msg = await (await fetch(`${MAILPIT}/api/v1/message/${id}`)).json();
+    const list = await (await fetch(`${MAILPIT}/api/v1/search?query=${encodeURIComponent(`to:"${email}"`)}&limit=5`)).json();
+    const hit = (list.messages ?? []).find((m: { To?: { Address: string }[] }) => m.To?.some((t) => t.Address.toLowerCase() === email.toLowerCase()));
+    if (hit) {
+      const msg = await (await fetch(`${MAILPIT}/api/v1/message/${hit.ID}`)).json();
       const m = String(msg.HTML || msg.Text).match(/href="([^"]+)"/) ?? String(msg.Text).match(/(https?:\/\/\S+)/);
       if (m) return m[1].replace(/&amp;/g, "&");
     }

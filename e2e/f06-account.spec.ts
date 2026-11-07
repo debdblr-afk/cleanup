@@ -22,7 +22,7 @@ test.describe("F06 accounts", () => {
   });
 
   test("F06-H1 guest adds an email, confirms it, keeps the batch, signs out", async ({ page }) => {
-    const email = `e2e-${Date.now()}@example.test`;
+    const email = `e2e-${Date.now()}-${Math.random().toString(36).slice(2, 8)}@example.test`;
     await startWithSample(page);
     const batch = page.url();
     await waitPreviewReady(page, /sample/i);

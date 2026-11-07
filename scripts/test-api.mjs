@@ -142,7 +142,12 @@ try {
   console.log("\nexports");
   check("4K from a 360p source -> 400 (never above the source)", (await call(A, "POST", `/api/jobs/${job1.id}/exports`, { resolution: "2160p" })).status === 400);
   check("above source (1080p from 360p) -> 400", (await call(A, "POST", `/api/jobs/${job1.id}/exports`, { resolution: "1080p" })).status === 400);
+  // Exports are unlimited: 10,000 already today must not stop the next one.
+  const today = new Date().toISOString().slice(0, 10);
+  await admin.from("usage_daily").upsert({ user_id: A.id, usage_date: today, kind: "export", count: 10000 });
   const e1 = await call(A, "POST", `/api/jobs/${job1.id}/exports`, { resolution: "720p" });
+  check("exports are unlimited (10,000 today, still allowed)", e1.status === 201 && (await usage(A.id, "export")) === 10001, JSON.stringify(e1.json));
+  await admin.from("usage_daily").update({ count: 1 }).eq("user_id", A.id).eq("kind", "export");
   check("export 720p -> queued", e1.status === 201 && e1.json.export.status === "queued");
   const e2 = await call(A, "POST", `/api/jobs/${job1.id}/exports`, { resolution: "720p" });
   check("same export twice -> 409, export given back", e2.status === 409 && (await usage(A.id, "export")) === 1);

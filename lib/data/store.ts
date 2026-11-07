@@ -220,6 +220,7 @@ export function quotaStatus() {
     previewsCap: plan.previewsPerDay,
     exportsLeft: Math.max(0, plan.exportsPerDay - u.export),
     exportsCap: plan.exportsPerDay,
+    exportsUnlimited: !Number.isFinite(plan.exportsPerDay),
     resetsInHours: hoursUntilUtcMidnight(),
   };
 }

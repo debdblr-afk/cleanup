@@ -80,7 +80,7 @@ function Account() {
 
         <section className="rounded-xl border border-border p-5" aria-labelledby="plan-h">
           <h2 id="plan-h" className="text-lg">Today</h2>
-          <p className="text-sm text-text-muted mt-1 tabnums">{q.previewsLeft} of {q.previewsCap} previews and {q.exportsLeft} of {q.exportsCap} exports left. They reset at midnight UTC.</p>
+          <p className="text-sm text-text-muted mt-1 tabnums">{q.previewsLeft} of {q.previewsCap} previews left; they reset at midnight UTC. {q.exportsUnlimited ? "Exports are unlimited." : `${q.exportsLeft} of ${q.exportsCap} exports left.`}</p>
           <p className="text-sm text-text-muted mt-2">Videos up to {formatDuration(plan.maxDurationMs)} and {formatBytes(plan.maxBytes)}, exported in up to 4K (never above your video&apos;s own resolution), kept for {plan.retentionDays} days.</p>
         </section>
 

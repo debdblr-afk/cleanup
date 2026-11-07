@@ -49,7 +49,9 @@ export function hoursUntilReset() {
 }
 
 export async function consumeQuota(userId: string, kind: "preview" | "export", cap: number): Promise<boolean> {
-  const { data, error } = await db().rpc("consume_quota", { p_user: userId, p_kind: kind, p_cap: cap } as never);
+  // An unlimited allowance still counts usage (so refunds stay right); the database takes a whole number.
+  const p_cap = Number.isFinite(cap) ? cap : 2_147_483_647;
+  const { data, error } = await db().rpc("consume_quota", { p_user: userId, p_kind: kind, p_cap } as never);
   if (error) throw error;
   return data === true;
 }

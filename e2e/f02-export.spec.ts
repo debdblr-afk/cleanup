@@ -16,7 +16,7 @@ test.describe("F02 export the full video", () => {
     const dlg = page.getByRole("dialog", { name: "Export video" });
     await expect(dlg.getByRole("button", { name: "Export 720p" })).toBeVisible();
     await expect(dlg.getByText(/See plans|Plus|Pro\b/)).toHaveCount(0);
-    await expect(dlg).toContainText("50 of 50 exports left today");
+    await expect(dlg).toContainText("Unlimited exports.");
     await axe(page);
     await page.keyboard.press("Escape");
     await expect(dlg).toBeHidden();
@@ -29,7 +29,7 @@ test.describe("F02 export the full video", () => {
     const dlg = page.getByRole("dialog", { name: "Export video" });
     // The sample is 720p, so 1080p, 2K and 4K are above the source.
     await expect(dlg.getByText("Above source")).toHaveCount(3);
-    await expect(dlg).toContainText("50 of 50 exports left today");
+    await expect(dlg).toContainText("Unlimited exports.");
     await dlg.getByRole("button", { name: "Export 720p" }).click();
     const link = dlg.getByRole("list", { name: "Exports" }).getByRole("link", { name: /^Download/ });
     await expect(link).toBeVisible({ timeout: 90_000 });
@@ -43,7 +43,6 @@ test.describe("F02 export the full video", () => {
     expect(info.durationMs).toBeGreaterThan(5000); // full length, not the 5 s preview
     await dlg.getByRole("button", { name: "Export 720p" }).click();
     await expect(dlg.getByRole("alert")).toContainText("already running or done");
-    await expect(dlg).toContainText("49 of 50 exports left today");
   });
 
   test("F02-H3 server export keeps the sound and the page can be closed", async ({ page, context }) => {

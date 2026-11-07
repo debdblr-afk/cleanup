@@ -54,7 +54,7 @@ export function ExportDialog({ job, video, open, onOpenChange }: { job: Job | nu
         })}
       </fieldset>
 
-      <p className="text-sm text-text-muted tabnums mt-4">{q.exportsLeft} of {q.exportsCap} exports left today. {SERVER_EXPORTS ? "Exports render on our servers as MP4 with sound. You can close this page; it'll be here when you come back." : "Exports render in this tab with the original sound: keep it open until it finishes."}</p>
+      <p className="text-sm text-text-muted tabnums mt-4">{q.exportsUnlimited ? "Unlimited exports." : `${q.exportsLeft} of ${q.exportsCap} exports left today.`} {SERVER_EXPORTS ? "Exports render on our servers as MP4 with sound. You can close this page; it'll be here when you come back." : "Exports render in this tab with the original sound: keep it open until it finishes."}</p>
 
       {message && <p role="alert" className="text-sm text-danger mt-3">{message}</p>}
 
