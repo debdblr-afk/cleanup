@@ -43,7 +43,7 @@ npm run worker            # needs WORKER_SECRET and APP_URL in .env.local, same 
 ## How it fits together
 
 - **Reads:** row level security plus Supabase Realtime. **Writes:** `app/api/*`, with ownership, plan limits and daily caps checked on the server.
-- **Files:** a private Supabase Storage bucket, reached only through 10-minute signed URLs (`lib/server/storage.ts`, the one file to change for R2).
+- **Files:** a private bucket reached only through short-lived signed URLs (`lib/server/storage.ts`). Locally, Supabase Storage; online, Cloudflare R2 (`STORAGE_PROVIDER=s3` + `S3_*`). Uploads are a signed PUT either way.
 - **Work queue:** `removal_jobs` and `exports`. Previews are claimed by the open tab (`claim_work()`, `lib/engine/`); exports by the server worker (`claim_export_any()`, `worker/`).
 - **Plans:** none. Everyone, guests included, gets the Pro limits (`DEFAULT_PLAN` in `lib/plans.ts`). The Stripe code was removed and is in git history.
 - **Crons** (`vercel.json`): `/api/cron/expire` hourly, `/api/cron/sweep` every 5 minutes, both behind `CRON_SECRET`.

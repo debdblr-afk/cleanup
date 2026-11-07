@@ -4,6 +4,7 @@
 // user B can see or touch nothing of user A's, then deletes both users.
 import { createClient } from "@supabase/supabase-js";
 import { createHmac, randomBytes } from "node:crypto";
+import { ListObjectsV2Command, S3Client } from "@aws-sdk/client-s3";
 
 const BASE = process.env.BASE ?? "http://localhost:5320";
 const URL_ = process.env.NEXT_PUBLIC_SUPABASE_URL;
@@ -35,6 +36,16 @@ const call = (user, method, path, body, headers = {}) =>
   }).then(async (r) => ({ status: r.status, json: await r.json().catch(() => null), location: r.headers.get("location") }));
 
 const tinyVideo = new Uint8Array(randomBytes(2048)); // bytes only; the server never decodes it
+// Storage back end: Supabase Storage (default) or S3 / R2 (STORAGE_PROVIDER=s3), same as the app.
+const S3_MODE = process.env.STORAGE_PROVIDER === "s3";
+const s3 = S3_MODE ? new S3Client({ endpoint: process.env.S3_ENDPOINT, region: process.env.S3_REGION || "auto", forcePathStyle: true, credentials: { accessKeyId: process.env.S3_ACCESS_KEY_ID, secretAccessKey: process.env.S3_SECRET_ACCESS_KEY } }) : null;
+const BUCKET = process.env.S3_BUCKET || "media";
+/** Files under a prefix, from whichever store the app uses. */
+const listFiles = async (prefix) => S3_MODE
+  ? ((await s3.send(new ListObjectsV2Command({ Bucket: BUCKET, Prefix: `${prefix}/` }))).Contents ?? [])
+  : ((await admin.storage.from("media").list(prefix)).data ?? []);
+/** PUT bytes to a one-time upload from the API. */
+const putTo = (upload, body) => fetch(upload.url, { method: "PUT", headers: upload.headers, body });
 const usage = async (uid, kind) => (await admin.from("usage_daily").select("count").eq("user_id", uid).eq("kind", kind).maybeSingle()).data?.count ?? 0;
 
 // A running export worker would claim this script's exports before the checks can.
@@ -58,12 +69,12 @@ try {
   const noAttest = await call(A, "POST", "/api/videos", { batchId: batch.id, filename: "a.webm", contentType: "video/webm", sizeBytes: 10, attestationVersion: "v" });
   check("missing attestation -> 400", noAttest.status === 400);
   const v = await call(A, "POST", "/api/videos", { batchId: batch.id, filename: "a.webm", contentType: "video/webm", sizeBytes: tinyVideo.length, attest: true, attestationVersion: "2026-11-07" });
-  check("create video + upload url", v.status === 201 && v.json.upload?.token, JSON.stringify(v.json));
+  check("create video + upload url", v.status === 201 && v.json.upload?.url?.startsWith("http"), JSON.stringify(v.json));
   const video = v.json.video;
   const early = await call(A, "POST", `/api/videos/${video.id}/complete`, { durationMs: 5000, width: 640, height: 360, thumbnail: null });
   check("complete before upload -> 409", early.status === 409);
-  const up = await A.client.storage.from("media").uploadToSignedUrl(v.json.upload.path, v.json.upload.token, tinyVideo, { contentType: "video/webm" });
-  check("upload to signed url", !up.error, up.error?.message);
+  const up = await putTo(v.json.upload, tinyVideo);
+  check("upload to signed url", up.ok, `${up.status} ${await up.text().catch(() => "")}`.slice(0, 200));
   const done = await call(A, "POST", `/api/videos/${video.id}/complete`, { durationMs: 5000, width: 640, height: 360, thumbnail: null });
   check("complete -> ready + first job", done.status === 200 && done.json.video.status === "ready" && done.json.job?.status === "queued", JSON.stringify(done.json));
   const job1 = done.json.job;
@@ -84,10 +95,15 @@ try {
   check("client can't upgrade own plan", (upd.data?.length ?? 0) === 0);
   const rpc = await A.client.rpc("consume_quota", { p_user: A.id, p_kind: "preview", p_cap: 99 });
   check("client can't call quota function", !!rpc.error);
-  const dl = await B.client.storage.from("media").download(video.original_key ?? `u/${A.id}/${video.id}/original`);
-  check("storage: B can't read A's file directly", !!dl.error);
-  const dlA = await A.client.storage.from("media").download(`u/${A.id}/${video.id}/original`);
-  check("storage: even A can't read without a signed URL", !!dlA.error);
+  if (S3_MODE) {
+    const raw = await fetch(`${process.env.S3_ENDPOINT}/${BUCKET}/u/${A.id}/${video.id}/original`);
+    check("storage: the bucket refuses unsigned reads", raw.status >= 400 && raw.status < 500, String(raw.status));
+  } else {
+    const dl = await B.client.storage.from("media").download(video.original_key ?? `u/${A.id}/${video.id}/original`);
+    check("storage: B can't read A's file directly", !!dl.error);
+    const dlA = await A.client.storage.from("media").download(`u/${A.id}/${video.id}/original`);
+    check("storage: even A can't read without a signed URL", !!dlA.error);
+  }
 
   console.log("\nB against A's records through the API");
   check("files", (await call(B, "GET", `/api/files?kind=original&id=${video.id}`)).status === 404);
@@ -112,14 +128,16 @@ try {
   const noFile = await call(A, "POST", `/api/worker/jobs/${job1.id}/complete`, { workerId: W, ok: true, durationMs: 5000 });
   check("complete without output -> 409", noFile.status === 409);
   const pu = (await call(A, "POST", `/api/worker/jobs/${job1.id}/upload-url`, { workerId: W, contentType: "video/webm" })).json.upload;
-  await A.client.storage.from("media").uploadToSignedUrl(pu.path, pu.token, tinyVideo, { contentType: "video/webm" });
+  await putTo(pu, tinyVideo);
   check("complete -> done", (await call(A, "POST", `/api/worker/jobs/${job1.id}/complete`, { workerId: W, ok: true, durationMs: 5000 })).status === 200);
   const j1 = (await admin.from("removal_jobs").select("*").eq("id", job1.id).single()).data;
   check("job stored done with detected zones", j1.status === "done" && j1.preview_key && j1.detected_mask?.regions?.length === 1);
   check("late complete -> 409", (await call(A, "POST", `/api/worker/jobs/${job1.id}/complete`, { workerId: W, ok: false })).status === 409);
   check("B can't fetch the preview", (await call(B, "GET", `/api/files?kind=preview&id=${job1.id}`)).status === 404);
   const dlLink = await call(A, "GET", `/api/files?kind=preview&id=${job1.id}&download=clip-cleaned.webm`);
-  check("A's preview download link names the file", dlLink.status === 302 && /download=clip-cleaned\.webm/.test(dlLink.location ?? ""), dlLink.location);
+  const dlHead = dlLink.location ? await fetch(dlLink.location) : null;
+  const disposition = dlHead?.headers.get("content-disposition") ?? "";
+  check("A's preview download link names the file", dlLink.status === 302 && /attachment/.test(disposition) && /clip-cleaned\.webm/.test(disposition), disposition || dlLink.location);
 
   console.log("\njobs, quota, cancel");
   const noZone = await call(A, "POST", `/api/videos/${video.id}/jobs`, { autoDetect: false, mask: { regions: [] } });
@@ -216,7 +234,7 @@ try {
     const early = await signed(route("complete"), { ok: true });
     check("complete before the file arrives -> 409", early.status === 409);
     const up = await signed(route("upload-url"));
-    const put = await fetch(up.json.upload.url, { method: "PUT", headers: { "content-type": "video/mp4", "x-upsert": "true" }, body: tinyVideo });
+    const put = await putTo(up.json.upload, tinyVideo);
     check("upload to the one-time URL", put.ok, String(put.status));
     const fin = await signed(route("complete"), { ok: true, durationMs: 5000 });
     const row = (await admin.from("exports").select("status, format, size_bytes").eq("id", mine.export.id).single()).data;
@@ -229,9 +247,9 @@ try {
   console.log("\nexpiry + account deletion");
   await admin.from("videos").update({ expires_at: new Date(Date.now() - 1000).toISOString() }).eq("id", video.id);
   const ex = await call(null, "GET", "/api/cron/expire", null, { authorization: `Bearer ${process.env.CRON_SECRET}` });
-  const left = await admin.storage.from("media").list(`u/${A.id}/${video.id}`);
+  const left = await listFiles(`u/${A.id}/${video.id}`);
   const vrow = (await admin.from("videos").select("status").eq("id", video.id).single()).data;
-  check("expire deletes files and marks the video", ex.status === 200 && ex.json.videos >= 1 && (left.data?.length ?? 0) === 0 && vrow.status === "deleted", JSON.stringify(ex.json));
+  check("expire deletes files and marks the video", ex.status === 200 && ex.json.videos >= 1 && left.length === 0 && vrow.status === "deleted", JSON.stringify(ex.json));
   const del = await call(A, "DELETE", "/api/account");
   const gone = await admin.auth.admin.getUserById(A.id);
   const rows = (await admin.from("batches").select("id").eq("user_id", A.id)).data;

@@ -117,7 +117,7 @@ async function render(work) {
     const size = (await stat(out)).size;
     const put = await fetch(upload.url, {
       method: "PUT",
-      headers: { "content-type": "video/mp4", "content-length": String(size), "x-upsert": "true" },
+      headers: { ...upload.headers, "content-length": String(size) },
       body: Readable.toWeb(createReadStream(out)),
       duplex: "half",
     });

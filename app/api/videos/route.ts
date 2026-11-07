@@ -27,6 +27,6 @@ export async function POST(req: Request) {
   if (error?.message?.includes("batch_full")) return fail(409, "batch_full", "A batch holds 30 videos. Start a new batch for the rest.");
   if (error || !data) return fail(500, "db", "Couldn't record the video.");
 
-  const upload = await signedUpload(keys.original(user.id, id));
+  const upload = await signedUpload(keys.original(user.id, id), input.contentType);
   return json({ video: toVideo(data), upload }, 201);
 }

@@ -13,7 +13,6 @@ import { mergeMasks } from "../mask";
 import { ACCEPTED_TYPES, ATTESTATION_VERSION, BATCH_LIMIT, PLANS, PREVIEW_MS, RESOLUTIONS, type Plan } from "../plans";
 import { fileUrl as apiFileUrl, planIdFor, toBatch, toExport, toJob, toProfile, toVideo } from "../rows";
 import type { Batch, Export, Job, Mask, Profile, RejectReason, Region, RemovalMode, Video } from "../types";
-import { MEDIA_BUCKET } from "../supabase/env";
 import { supabaseBrowser } from "../supabase/client";
 
 // ---------------------------------------------------------------------------
@@ -278,7 +277,7 @@ export async function addVideos(batchId: string, files: File[], source: "upload"
     try { meta = await probe(file); } catch { rejected.push({ filename: file.name, reason: "corrupt" }); continue; }
     if (meta.durationMs > plan.maxDurationMs) { rejected.push({ filename: file.name, reason: "too_long", durationMs: meta.durationMs }); continue; }
     try {
-      const res = await api<{ video: Video; upload: { path: string; token: string } }>("/api/videos", {
+      const res = await api<{ video: Video; upload: Upload }>("/api/videos", {
         body: { batchId, filename: file.name || "video", contentType: type, sizeBytes: file.size, source, attest: true, attestationVersion: ATTESTATION_VERSION },
       });
       const video = res.video;
@@ -286,7 +285,7 @@ export async function addVideos(batchId: string, files: File[], source: "upload"
       count++;
       added.push(video);
       emit();
-      void upload(video, file, type, res.upload, meta);
+      void upload(video, file, res.upload, meta);
     } catch (e) {
       rejected.push({ filename: file.name, reason: e instanceof ApiError && e.code === "batch_full" ? "batch_full" : "failed", message: e instanceof Error ? e.message : undefined });
     }
@@ -314,13 +313,20 @@ export function uploadStalled(video: Video): boolean {
   return now - last > 10_000 && now - new Date(video.createdAt).getTime() > UPLOAD_GRACE_MS;
 }
 
-async function upload(video: Video, file: File, type: string, target: { path: string; token: string }, meta: Awaited<ReturnType<typeof probe>>) {
+/** A one-time upload from the server: PUT the bytes to `url` with these headers (Supabase Storage or R2). */
+type Upload = { url: string; headers: Record<string, string> };
+
+async function putUpload(target: Upload, body: Blob) {
+  const res = await fetch(target.url, { method: "PUT", headers: target.headers, body });
+  if (!res.ok) throw new Error(`upload failed (${res.status})`);
+}
+
+async function upload(video: Video, file: File, target: Upload, meta: Awaited<ReturnType<typeof probe>>) {
   originals.set(video.id, file); // keep it for this tab's worker: no need to download it again
   stampUpload(video.id, true);
   const stamp = setInterval(() => stampUpload(video.id, true), 3_000);
   try {
-    const { error } = await supabaseBrowser().storage.from(MEDIA_BUCKET).uploadToSignedUrl(target.path, target.token, file, { contentType: type });
-    if (error) throw error;
+    await putUpload(target, file);
     const res = await api<{ video: Video; job: Job | null }>(`/api/videos/${video.id}/complete`, {
       body: { durationMs: meta.durationMs, width: meta.width, height: meta.height, thumbnail: meta.thumbnail },
     });
@@ -553,9 +559,8 @@ async function report(kind: "jobs" | "exports", id: string, body: Record<string,
 
 async function uploadOutput(kind: "jobs" | "exports", id: string, blob: Blob) {
   const contentType = blob.type.startsWith("video/mp4") ? "video/mp4" : "video/webm";
-  const { upload } = await api<{ upload: { path: string; token: string } }>(`/api/worker/${kind}/${id}/upload-url`, { body: { workerId, contentType } });
-  const { error } = await supabaseBrowser().storage.from(MEDIA_BUCKET).uploadToSignedUrl(upload.path, upload.token, blob, { contentType });
-  if (error) throw new RenderError("render_failed", "Upload of the result failed.");
+  const { upload } = await api<{ upload: Upload }>(`/api/worker/${kind}/${id}/upload-url`, { body: { workerId, contentType } });
+  try { await putUpload(upload, blob); } catch { throw new RenderError("render_failed", "Upload of the result failed."); }
 }
 
 /** Keeps the claim alive while a step reports nothing (detection, upload of the result). */

@@ -28,8 +28,7 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
     return json({ ok: true });
   }
   if (action === "upload-url") {
-    const { url } = await signedUpload(path);
-    return json({ upload: { url } });
+    return json({ upload: await signedUpload(path, "video/mp4") });
   }
 
   const c = auth.input as z.infer<typeof complete>;
