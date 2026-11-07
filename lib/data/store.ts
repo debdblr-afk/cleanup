@@ -415,11 +415,20 @@ export async function cancelJob(jobId: string) {
     emit();
     void refreshUsage();
   } catch {
-    /* already finished */
+    // Already finished or moved on: show what the server has.
+    await reloadJob(jobId).catch(() => {});
   }
 }
 
-export async function retryJob(jobId: string): Promise<CreateJobResult> {
+/** Re-read one job from the server, when this tab's copy may be out of date. */
+async function reloadJob(jobId: string) {
+  const { data } = await supabaseBrowser().from("removal_jobs").select("*").eq("id", jobId).maybeSingle();
+  if (data) { state.jobs.set(jobId, toJob(data)); emit(); }
+}
+
+export type RetryResult = CreateJobResult | { ok: false; reason: "refused"; message: string };
+
+export async function retryJob(jobId: string): Promise<RetryResult> {
   try {
     const { job: j } = await api<{ job: Job }>(`/api/jobs/${jobId}/retry`);
     state.jobs.set(j.id, j);
@@ -428,7 +437,10 @@ export async function retryJob(jobId: string): Promise<CreateJobResult> {
     kickWorker();
     return { ok: true, job: j };
   } catch (e) {
-    return capOrThrow(e);
+    if (e instanceof ApiError && e.code === "daily_cap") return capOrThrow(e);
+    // Anything else (the job moved on, a network blip): show the real state instead of crashing.
+    await reloadJob(jobId).catch(() => {});
+    return { ok: false, reason: "refused", message: e instanceof Error ? e.message : "Try again in a moment." };
   }
 }
 

@@ -2,6 +2,7 @@
 import * as Menu from "@radix-ui/react-dropdown-menu";
 import { Download, Ellipsis, Pencil, Trash2 } from "lucide-react";
 import Link from "next/link";
+import { useState } from "react";
 import { useStore, useFileUrl } from "@/lib/data/hooks";
 import { cancelJob, createJob, getPlan, latestJob, queuePosition, quotaStatus, removeVideo, retryJob, uploadStalled } from "@/lib/data/store";
 import { formatBytes, formatDuration, formatResolution, ordinal } from "@/lib/format";
@@ -25,9 +26,17 @@ export function FileCard({ video, onExport }: { video: Video; onExport: (job: Jo
 
   const meta = [formatDuration(video.durationMs), formatResolution(video.height), formatBytes(video.sizeBytes)].filter(Boolean).join(" · ");
 
+  const [retrying, setRetrying] = useState(false);
   const startAgain = async (j: Job) => {
-    const r = await retryJob(j.id);
-    if (!r.ok && r.reason === "daily_cap") toast(`No previews left today. They reset in ${r.resetsInHours} h.`, "error");
+    if (retrying) return;
+    setRetrying(true);
+    try {
+      const r = await retryJob(j.id);
+      if (!r.ok && r.reason === "daily_cap") toast(`No previews left today. They reset in ${r.resetsInHours} h.`, "error");
+      else if (!r.ok && r.reason === "refused") toast(`Couldn't start it again: ${r.message}`, "error");
+    } finally {
+      setRetrying(false);
+    }
   };
 
   const remove = async () => { await removeVideo(video.id); toast(`Removed ${video.filename}`); };
@@ -105,7 +114,7 @@ export function FileCard({ video, onExport }: { video: Video; onExport: (job: Jo
       <>
         <StatusBadge tone={job.status === "canceled" ? "neutral" : "danger"}>{job.status === "canceled" ? "Canceled" : "Failed"}</StatusBadge>
         {job.errorMessage && <p className="text-xs text-text-muted">{job.errorMessage}</p>}
-        <Button size="sm" variant="outline" className="w-fit" onClick={() => startAgain(job)}>Try again</Button>
+        <Button size="sm" variant="outline" className="w-fit" loading={retrying} onClick={() => startAgain(job)}>Try again</Button>
       </>
     );
   }

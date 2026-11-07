@@ -90,4 +90,25 @@ test.describe("F02 export the full video", () => {
     const info = probe(await file.path());
     expect(info).toMatchObject({ height: 720, hasAudio: true });
   });
+
+  test("F02-H4 the export keeps the original sound (tab or server)", async ({ page }) => {
+    await page.goto("/");
+    await attestBox(page).check();
+    await uploadFiles(page, ["clip-sound.webm"]);
+    await page.waitForURL(/\/b\//);
+    const batch = page.url();
+    await waitPreviewReady(page, "clip-sound.webm");
+    await setDemoPlan(page, "Plus");
+    await page.goto(batch);
+    await card(page, "clip-sound.webm").getByRole("button", { name: "Export" }).click();
+    const dlg = page.getByRole("dialog", { name: "Export video" });
+    await dlg.getByRole("button", { name: "Export 720p" }).click();
+    const link = dlg.getByRole("list", { name: "Exports" }).getByRole("link", { name: /^Download/ });
+    await expect(link).toBeVisible({ timeout: 90_000 });
+    const dl = page.waitForEvent("download");
+    await link.click();
+    const file = await dl;
+    expect(file.suggestedFilename()).toMatch(new RegExp(`-cleaned-720p\\.${EXT}$`));
+    expect(probe(await file.path())).toMatchObject({ height: 720, hasAudio: true });
+  });
 });

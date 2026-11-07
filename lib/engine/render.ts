@@ -1,8 +1,10 @@
 // Renders a cleaned copy of a video in the browser: plays it (muted) into a canvas, fills
 // every active erase region each frame, and records the canvas. Stand-in for the GPU
 // worker's render(preview | full); same inputs (video, mask, limits) and output (a file).
-// Audio is not carried over here; the worker re-muxes the original audio.
+// The original sound is carried over: the video's audio is routed (not to the speakers) into
+// the recording, in sync because the video plays in real time.
 
+import fixWebmDuration from "fix-webm-duration";
 import { activeAt, rasterizeBrush, toPixels } from "../mask";
 import type { Mask } from "../types";
 import { fillMask, fillRect } from "./inpaint";
@@ -23,6 +25,34 @@ export class RenderError extends Error {
   }
 }
 
+/** WebM with Opus sound when the browser can record it, else whatever video type it has. */
+function typeWithAudio(videoType: string): string {
+  const withSound = ["video/webm;codecs=vp9,opus", "video/webm;codecs=vp8,opus", "video/webm;codecs=opus", "video/mp4;codecs=avc1,mp4a"];
+  return withSound.find((t) => MediaRecorder.isTypeSupported(t)) ?? videoType;
+}
+
+/**
+ * The video's sound as a track for the recorder. Sound goes to the recording only, never the
+ * speakers. Returns null when the browser won't allow it; the export then has no sound.
+ */
+async function audioTrackFor(v: HTMLVideoElement): Promise<{ track: MediaStreamTrack; close: () => void } | null> {
+  if (typeof AudioContext === "undefined") return null;
+  try {
+    const ctx = new AudioContext();
+    const dest = ctx.createMediaStreamDestination();
+    ctx.createMediaElementSource(v).connect(dest);
+    // Exports start from a click, which lets the page start audio.
+    if (ctx.state !== "running") await ctx.resume().catch(() => {});
+    v.muted = false;
+    v.volume = 1;
+    const track = dest.stream.getAudioTracks()[0];
+    if (!track) { void ctx.close(); return null; }
+    return { track, close: () => void ctx.close() };
+  } catch {
+    return null;
+  }
+}
+
 export async function render(source: Blob, mask: Mask, opts: RenderOptions): Promise<RenderResult> {
   const type = pickRecorderType();
   if (!type || typeof HTMLCanvasElement.prototype.captureStream !== "function") {
@@ -30,6 +60,7 @@ export async function render(source: Blob, mask: Mask, opts: RenderOptions): Pro
   }
   const url = URL.createObjectURL(source);
   let video: HTMLVideoElement | null = null;
+  let audio: Awaited<ReturnType<typeof audioTrackFor>> = null;
   try {
     video = await loadVideo(url);
     const v = video;
@@ -97,7 +128,10 @@ export async function render(source: Blob, mask: Mask, opts: RenderOptions): Pro
     // First frame before recording starts, so the file doesn't open on black.
     drawFrame();
     const stream = canvas.captureStream(30);
-    const recorder = new MediaRecorder(stream, { mimeType: type, videoBitsPerSecond: height >= 1080 ? 8_000_000 : 4_000_000 });
+    audio = await audioTrackFor(v);
+    if (audio) stream.addTrack(audio.track);
+    const recordType = audio ? typeWithAudio(type) : type;
+    const recorder = new MediaRecorder(stream, { mimeType: recordType, videoBitsPerSecond: height >= 1080 ? 8_000_000 : 4_000_000, audioBitsPerSecond: 160_000 });
     const chunks: Blob[] = [];
     recorder.ondataavailable = (e) => { if (e.data.size) chunks.push(e.data); };
     const stopped = new Promise<void>((resolve) => { recorder.onstop = () => resolve(); });
@@ -135,14 +169,17 @@ export async function render(source: Blob, mask: Mask, opts: RenderOptions): Pro
     clearTimeout(guard);
     opts.signal?.removeEventListener("abort", onAbort);
     if (opts.signal?.aborted) throw new RenderError("canceled", "Canceled");
-    const blob = new Blob(chunks, { type: type.split(";")[0] });
+    let blob = new Blob(chunks, { type: recordType.split(";")[0] });
     if (!blob.size) throw new RenderError("render_failed", "The recording came out empty.");
+    // MediaRecorder leaves the length out of WebM files; write it in so players can show it and seek.
+    if (blob.type === "video/webm") blob = await fixWebmDuration(blob, endS * 1000, { logger: false }).catch(() => blob);
     opts.onProgress?.(100);
     return { blob, durationMs: Math.round(endS * 1000), width, height };
   } catch (e) {
     if (e instanceof RenderError) throw e;
     throw new RenderError("render_failed", e instanceof Error ? e.message : "Render failed");
   } finally {
+    audio?.close();
     if (video) disposeVideo(video);
     URL.revokeObjectURL(url);
   }

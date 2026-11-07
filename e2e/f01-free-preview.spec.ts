@@ -108,6 +108,20 @@ test.describe("F01 guest cleans a video and grabs the free preview", () => {
     await expect(c.getByText(/Cleaning the 5 s preview/)).toHaveCount(0);
   });
 
+  test("F01-E3c Try again refused by the server: a message, the real state, no crash (BUG-011)", async ({ page }) => {
+    await page.goto("/");
+    await attestBox(page).check();
+    await uploadFiles(page, ["clip-b.webm"]);
+    await page.waitForURL(/\/b\//);
+    const c = card(page, "clip-b.webm");
+    await c.getByRole("button", { name: "Cancel" }).click({ timeout: 30_000 });
+    await expect(c.getByText("Canceled")).toBeVisible();
+    await page.route("**/api/jobs/*/retry", (r) => r.fulfill({ status: 409, contentType: "application/json", body: JSON.stringify({ error: { code: "not_finished", message: "Only failed or canceled jobs can be retried." } }) }));
+    await c.getByRole("button", { name: "Try again" }).click();
+    await expect(page.getByText(/Couldn.t start it again/)).toBeVisible();
+    await expect(c.getByText("Canceled")).toBeVisible();
+  });
+
   test("F01-E4 a 70-character name with accents and emoji fits its card at 390 px", async ({ page }, info) => {
     const long = "Été à Montréal 🎬 démo finale v2 – coupe longue pour Instagram et TikTok.webm";
     const target = info.outputPath(long);
