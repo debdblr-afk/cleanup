@@ -6,7 +6,10 @@ import { fileUrl, getState, getVersion, hydrate, subscribe } from "./store";
 export function useStore(): { hydrated: boolean; version: number } {
   useEffect(() => { void hydrate(); }, []);
   const version = useSyncExternalStore(subscribe, getVersion, () => 0);
-  return { hydrated: getState().hydrated, version };
+  // Through the snapshot, so a Suspense boundary that hydrates after the store has loaded
+  // still renders what the server sent first (false), then updates.
+  const hydrated = useSyncExternalStore(subscribe, () => getState().hydrated, () => false);
+  return { hydrated, version };
 }
 
 /** URL for a stored file (redirects to a short-lived signed URL), or null when not ready. */

@@ -152,6 +152,30 @@ try {
   const sw = await call(null, "GET", "/api/cron/sweep", null, { authorization: `Bearer ${process.env.CRON_SECRET}` });
   const stuckAfter = (await admin.from("removal_jobs").select("status").eq("id", stuck.id).single()).data;
   check("sweep requeues quiet work", sw.status === 200 && sw.json.swept >= 1 && stuckAfter.status === "queued", JSON.stringify(sw.json));
+  // BUG-003: after a refresh mid-clean, the new tab takes back its own work once it has been quiet for 30 s.
+  const parkedJobs = (await admin.from("removal_jobs").update({ status: "canceled" }).eq("user_id", A.id).eq("status", "queued").select("id")).data.map((r) => r.id);
+  const parkedExports = (await admin.from("exports").update({ status: "failed" }).eq("user_id", A.id).eq("status", "queued").select("id")).data.map((r) => r.id);
+  await admin.from("removal_jobs").update({ status: "rendering", worker_ref: "tab-old-1234", heartbeat_at: new Date(Date.now() - 5_000).toISOString(), attempts: 1 }).eq("id", stuck.id);
+  const busyClaim = await call(A, "POST", "/api/worker/claim", { workerId: "tab-new-1234" });
+  check("claim leaves work that is still heartbeating", busyClaim.status === 200 && busyClaim.json.work?.job?.id !== stuck.id, JSON.stringify(busyClaim.json));
+  await admin.from("removal_jobs").update({ heartbeat_at: new Date(Date.now() - 40_000).toISOString() }).eq("id", stuck.id);
+  const reclaim = await call(A, "POST", "/api/worker/claim", { workerId: "tab-new-1234" });
+  check("claim takes back own work quiet for 30 s", reclaim.status === 200 && reclaim.json.work?.job?.id === stuck.id, JSON.stringify(reclaim.json));
+  const lateOld = await call(A, "POST", `/api/worker/jobs/${stuck.id}/progress`, { workerId: "tab-old-1234", progress: 50 });
+  check("the old tab's late report is refused", lateOld.status === 409, String(lateOld.status));
+  const crossClaim = await call(B, "POST", "/api/worker/claim", { workerId: "tab-b-12345" });
+  check("another user never takes it", crossClaim.json.work == null || crossClaim.json.work.job?.id !== stuck.id);
+  await admin.from("removal_jobs").update({ status: "queued", worker_ref: null, attempts: 0 }).eq("id", stuck.id);
+  if (parkedJobs.length) await admin.from("removal_jobs").update({ status: "queued" }).in("id", parkedJobs);
+  if (parkedExports.length) await admin.from("exports").update({ status: "queued" }).in("id", parkedExports);
+  // BUG-002: an upload abandoned mid-way (tab closed or refreshed) stays "uploading" forever.
+  const abandoned = (await call(A, "POST", "/api/videos", { batchId: batch.id, filename: "gone.webm", contentType: "video/webm", sizeBytes: 10, attest: true, attestationVersion: "2026-11-07" })).json.video;
+  const fresh = (await call(A, "POST", "/api/videos", { batchId: batch.id, filename: "still-going.webm", contentType: "video/webm", sizeBytes: 10, attest: true, attestationVersion: "2026-11-07" })).json.video;
+  await admin.from("videos").update({ created_at: new Date(Date.now() - 4 * 3600_000).toISOString() }).eq("id", abandoned.id);
+  const sw2 = await call(null, "GET", "/api/cron/sweep", null, { authorization: `Bearer ${process.env.CRON_SECRET}` });
+  const leftIds = (await admin.from("videos").select("id").in("id", [abandoned.id, fresh.id])).data.map((r) => r.id);
+  check("sweep removes uploads abandoned for 3 h, keeps fresh ones", sw2.status === 200 && !leftIds.includes(abandoned.id) && leftIds.includes(fresh.id), JSON.stringify({ sw2: sw2.json, leftIds }));
+  await call(A, "DELETE", `/api/videos/${fresh.id}`);
 
   console.log("\nstripe webhook");
   const secret = process.env.STRIPE_WEBHOOK_SECRET;

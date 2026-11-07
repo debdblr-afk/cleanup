@@ -23,9 +23,9 @@ const NAV = [
 
 export function Logo() {
   return (
-    <Link href="/" className="flex items-center gap-2 font-bold text-lg shrink-0" aria-label="Cleanup home">
+    <Link href="/" className="flex items-center gap-2 font-bold text-lg shrink-0">
       <span className="size-8 rounded-md bg-accent text-on-accent grid place-items-center text-sm" aria-hidden>C</span>
-      <span>Cleanup</span>
+      <span>Cleanup<span className="sr-only"> home</span></span>
     </Link>
   );
 }
@@ -55,7 +55,7 @@ function AccountLink() {
   useEffect(() => setMounted(true), []);
   const profile = mounted ? getState().profile : null;
   if (profile && !profile.isAnonymous)
-    return <Link href="/account" className={buttonClass("outline", "sm", "rounded-pill max-w-[180px]")}><span className="truncate">{profile.email ?? "Account"}</span></Link>;
+    return <Link href="/account" className={buttonClass("outline", "sm", "rounded-pill min-w-0 max-w-[120px] sm:max-w-[180px]")}><span className="truncate">{profile.email ?? "Account"}</span></Link>;
   return <Link href="/login" className={buttonClass("secondary", "sm", "rounded-pill")}>{profile ? "Save work" : "Log in"}</Link>;
 }
 
@@ -65,7 +65,7 @@ export function SiteHeader() {
   useEffect(() => setOpen(false), [path]);
   return (
     <header className="border-b border-border bg-bg sticky top-0 z-30">
-      <div className="mx-auto max-w-page px-4 lg:px-8 h-14 flex items-center gap-6">
+      <div className="mx-auto max-w-page px-4 lg:px-8 h-14 flex items-center gap-3 sm:gap-6">
         <Logo />
         <nav aria-label="Main" className="hidden lg:flex gap-6 text-sm font-medium text-text-muted">
           {NAV.map((n) => (
@@ -74,7 +74,7 @@ export function SiteHeader() {
             </Link>
           ))}
         </nav>
-        <div className="ml-auto flex items-center gap-3">
+        <div className="ml-auto min-w-0 flex items-center gap-3">
           <div className="hidden md:block"><QuotaMeter /></div>
           <AccountLink />
           <button className="lg:hidden size-10 grid place-items-center rounded-md hover:bg-surface-hover" aria-label={open ? "Close menu" : "Open menu"} aria-expanded={open} aria-controls="mobile-nav" onClick={() => setOpen(!open)}>

@@ -3,7 +3,7 @@ import * as Menu from "@radix-ui/react-dropdown-menu";
 import { Download, Ellipsis, Pencil, Trash2 } from "lucide-react";
 import Link from "next/link";
 import { useStore, useFileUrl } from "@/lib/data/hooks";
-import { cancelJob, createJob, getPlan, latestJob, queuePosition, quotaStatus, removeVideo, retryJob } from "@/lib/data/store";
+import { cancelJob, createJob, getPlan, latestJob, queuePosition, quotaStatus, removeVideo, retryJob, uploadStalled } from "@/lib/data/store";
 import { formatBytes, formatDuration, formatResolution, ordinal } from "@/lib/format";
 import type { Job, Video } from "@/lib/types";
 import { buttonClass, Button, ProgressBar, StatusBadge } from "@/components/ui/primitives";
@@ -30,8 +30,18 @@ export function FileCard({ video, onExport }: { video: Video; onExport: (job: Jo
     if (!r.ok && r.reason === "daily_cap") toast(`No previews left today. They reset in ${r.resetsInHours} h.`, "error");
   };
 
+  const remove = async () => { await removeVideo(video.id); toast(`Removed ${video.filename}`); };
+
   let body: React.ReactNode;
-  if (video.status === "uploading" || video.status === "probing") {
+  if (uploadStalled(video)) {
+    body = (
+      <>
+        <StatusBadge tone="danger">Upload stopped</StatusBadge>
+        <p className="text-xs text-text-muted">The upload didn&apos;t finish, maybe because the page was closed or refreshed. Remove it and add the file again.</p>
+        <Button size="sm" variant="outline" className="w-fit" onClick={remove}>Remove</Button>
+      </>
+    );
+  } else if (video.status === "uploading" || video.status === "probing") {
     body = (<><ProgressBar value={null} label={`Reading ${video.filename}`} /><p className="text-xs text-text-muted">{video.status === "uploading" ? "Saving the file" : "Reading the video"}</p></>);
   } else if (video.status === "rejected") {
     const plan = getPlan();
@@ -128,7 +138,7 @@ export function FileCard({ video, onExport }: { video: Video; onExport: (job: Jo
                   </Menu.Item>
                 )}
                 <Menu.Item
-                  onSelect={async () => { await removeVideo(video.id); toast(`Removed ${video.filename}`); }}
+                  onSelect={remove}
                   className="w-full h-9 px-3 flex items-center gap-2 text-danger outline-none data-[highlighted]:bg-danger-soft cursor-pointer"
                 >
                   <Trash2 className="size-4" aria-hidden />Remove from batch

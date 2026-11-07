@@ -299,8 +299,30 @@ export async function addVideos(batchId: string, files: File[], source: "upload"
   return { added, rejected };
 }
 
+// Uploads run in the page that started them. Each one stamps localStorage every few seconds, so
+// any tab in this browser can tell a live upload from one a refresh or a closed tab cut short.
+const UPLOAD_KEY = (id: string) => `cleanup.upload.${id}`;
+const failedUploads = new Set<string>();
+const UPLOAD_GRACE_MS = 20_000;
+
+function stampUpload(id: string, on: boolean) {
+  try { if (on) localStorage.setItem(UPLOAD_KEY(id), String(Date.now())); else localStorage.removeItem(UPLOAD_KEY(id)); } catch { /* ignore */ }
+}
+
+/** True when a card says "uploading" but nothing in this browser is uploading it any more. */
+export function uploadStalled(video: Video): boolean {
+  if (video.status !== "uploading") return false;
+  if (failedUploads.has(video.id)) return true;
+  let last = 0;
+  try { last = Number(localStorage.getItem(UPLOAD_KEY(video.id)) ?? 0); } catch { /* ignore */ }
+  const now = Date.now();
+  return now - last > 10_000 && now - new Date(video.createdAt).getTime() > UPLOAD_GRACE_MS;
+}
+
 async function upload(video: Video, file: File, type: string, target: { path: string; token: string }, meta: Awaited<ReturnType<typeof probe>>) {
   originals.set(video.id, file); // keep it for this tab's worker: no need to download it again
+  stampUpload(video.id, true);
+  const stamp = setInterval(() => stampUpload(video.id, true), 3_000);
   try {
     const { error } = await supabaseBrowser().storage.from(MEDIA_BUCKET).uploadToSignedUrl(target.path, target.token, file, { contentType: type });
     if (error) throw error;
@@ -313,9 +335,12 @@ async function upload(video: Video, file: File, type: string, target: { path: st
     void refreshUsage();
     kickWorker();
   } catch {
-    // Leave the card in "uploading"; removing it is one click, and the expiry job cleans it up.
-    state.videos.set(video.id, { ...video, status: "rejected", rejectReason: "corrupt" });
+    // The card shows "Upload stopped" with a Remove button; the sweep job deletes it after 3 h.
+    failedUploads.add(video.id);
     emit();
+  } finally {
+    clearInterval(stamp);
+    stampUpload(video.id, false);
   }
 }
 
@@ -491,12 +516,16 @@ function kickWorker() {
   })();
 }
 
-// Fallback poll: picks up queued work if a Realtime event was missed.
+// Fallback poll: picks up queued work if a Realtime event was missed, and work a refreshed or
+// closed tab left half done (the server hands it over once it has been quiet for 30 s).
 if (typeof window !== "undefined") {
   setInterval(() => {
-    const queued = [...state.jobs.values()].some((j) => j.status === "queued") || [...state.exports.values()].some((e) => e.status === "queued");
-    if (queued) kickWorker();
-  }, 15_000);
+    const jobs = [...state.jobs.values()], exps = [...state.exports.values()];
+    const queued = jobs.some((j) => j.status === "queued") || exps.some((e) => e.status === "queued");
+    const orphaned = !running && (jobs.some((j) => j.status === "detecting" || j.status === "rendering") || exps.some((e) => e.status === "rendering"));
+    if (queued || orphaned) kickWorker();
+    if ([...state.videos.values()].some((v) => v.status === "uploading")) emit(); // lets cards notice a stalled upload
+  }, 10_000);
 }
 
 function throttle(fn: (pct: number) => void, ms: number) {
@@ -522,9 +551,16 @@ async function uploadOutput(kind: "jobs" | "exports", id: string, blob: Blob) {
   if (error) throw new RenderError("render_failed", "Upload of the result failed.");
 }
 
+/** Keeps the claim alive while a step reports nothing (detection, upload of the result). */
+function heartbeat(kind: "jobs" | "exports", id: string, abort: AbortController, pct: () => number) {
+  const t = setInterval(() => void report(kind, id, { progress: pct() }, abort), 10_000);
+  return () => clearInterval(t);
+}
+
 async function runJob(job: Job) {
   const abort = new AbortController();
   running = { id: job.id, abort };
+  const stopBeat = heartbeat("jobs", job.id, abort, () => state.jobs.get(job.id)?.progress ?? 0);
   state.jobs.set(job.id, job);
   emit();
   let detected: Mask | null = null;
@@ -547,8 +583,10 @@ async function runJob(job: Job) {
     const out = await render(source, mergeMasks(job.mask, detected), {
       limitMs: PREVIEW_MS, maxHeight: 720, signal: abort.signal,
       onProgress: (pct) => {
+        // A late frame after Cancel must not turn a canceled card back into "Cleaning 99%".
+        if (abort.signal.aborted) return;
         const cur = state.jobs.get(job.id);
-        if (cur) { state.jobs.set(job.id, { ...cur, status: "rendering", progress: pct }); emit(); }
+        if (cur && (cur.status === "detecting" || cur.status === "rendering")) { state.jobs.set(job.id, { ...cur, status: "rendering", progress: pct }); emit(); }
         tick(pct);
       },
     });
@@ -560,6 +598,7 @@ async function runJob(job: Job) {
     const code = e instanceof RenderError && e.code === "unsupported_browser" ? "unsupported_browser" : "render_failed";
     await api(`/api/worker/jobs/${job.id}/complete`, { body: { workerId, ok: false, errorCode: code, ...(detected ? { detectedMask: detected } : {}) } }).catch(() => {});
   } finally {
+    stopBeat();
     running = null;
   }
 }
@@ -567,6 +606,7 @@ async function runJob(job: Job) {
 async function runExport(ex: Export) {
   const abort = new AbortController();
   running = { id: ex.id, abort };
+  const stopBeat = heartbeat("exports", ex.id, abort, () => state.exports.get(ex.id)?.progress ?? 0);
   try {
     let job = state.jobs.get(ex.jobId);
     if (!job) {
@@ -580,8 +620,9 @@ async function runExport(ex: Export) {
     const out = await render(source, effectiveMask(job), {
       limitMs: null, maxHeight: height, signal: abort.signal,
       onProgress: (pct) => {
+        if (abort.signal.aborted) return;
         const cur = state.exports.get(ex.id);
-        if (cur) { state.exports.set(ex.id, { ...cur, status: "rendering", progress: pct }); emit(); }
+        if (cur && (cur.status === "queued" || cur.status === "rendering")) { state.exports.set(ex.id, { ...cur, status: "rendering", progress: pct }); emit(); }
         tick(pct);
       },
     });
@@ -591,6 +632,7 @@ async function runExport(ex: Export) {
   } catch {
     if (!abort.signal.aborted) await api(`/api/worker/exports/${ex.id}/complete`, { body: { workerId, ok: false } }).catch(() => {});
   } finally {
+    stopBeat();
     running = null;
   }
 }

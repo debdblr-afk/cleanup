@@ -35,7 +35,7 @@ export default function BatchPage() {
       <div className="mx-auto max-w-[640px] px-4 py-16">
         <EmptyState
           icon={<Clapperboard />} title="This batch isn't here"
-          body="It may have expired, or it was made in another browser. In this preview version, videos stay in the browser that added them."
+          body="It may have expired or been removed, or it belongs to another account. If you made it, sign in with the email you used."
           action={<Link href="/" className={buttonClass("primary", "md")}>Start a new batch</Link>}
         />
       </div>

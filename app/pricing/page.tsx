@@ -129,7 +129,8 @@ function Pricing() {
       <section className="mt-16" aria-labelledby="compare">
         <h2 id="compare" className="text-xl">Compare plans</h2>
         {/* relative: keeps the absolutely positioned sr-only labels inside the scroll box on phones */}
-        <div className="relative mt-4 overflow-x-auto rounded-xl border border-border">
+        {/* tabIndex + region: on phones the table scrolls sideways, so keyboard users must be able to focus it */}
+        <div className="relative mt-4 overflow-x-auto rounded-xl border border-border focus-visible:outline-2 focus-visible:outline-accent" tabIndex={0} role="region" aria-labelledby="compare">
           <table className="w-full text-sm min-w-[560px]">
             <thead className="bg-surface">
               <tr>

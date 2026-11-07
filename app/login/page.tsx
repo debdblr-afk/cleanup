@@ -5,7 +5,7 @@ import { Suspense, useEffect, useId, useState } from "react";
 import { Button, buttonClass } from "@/components/ui/primitives";
 import { useStore } from "@/lib/data/hooks";
 import { getState } from "@/lib/data/store";
-import { safeNext } from "@/lib/supabase/env";
+import { safeNext, SUPABASE_URL, SUPABASE_ANON_KEY } from "@/lib/supabase/env";
 import { supabaseBrowser } from "@/lib/supabase/client";
 
 function LoginForm() {
@@ -21,7 +21,15 @@ function LoginForm() {
   const [busy, setBusy] = useState(false);
   const [existing, setExisting] = useState(false);
   const [mounted, setMounted] = useState(false);
+  const [googleOn, setGoogleOn] = useState(false);
   useEffect(() => setMounted(true), []);
+  // Only offer Google when the provider is switched on; otherwise its button leads to a raw error page.
+  useEffect(() => {
+    fetch(`${SUPABASE_URL}/auth/v1/settings`, { headers: { apikey: SUPABASE_ANON_KEY } })
+      .then((r) => (r.ok ? r.json() : null))
+      .then((s) => setGoogleOn(!!s?.external?.google))
+      .catch(() => {});
+  }, []);
 
   const profile = mounted ? getState().profile : null;
   const guest = !!profile?.isAnonymous;
@@ -77,8 +85,12 @@ function LoginForm() {
       <p className="text-sm text-text-muted">
         {checkout ? "Plans are tied to an account so you can manage or cancel them any time." : guest ? "Add your email to keep your batches. Everything you've added as a guest stays where it is." : "We'll email you a link. No password needed."}
       </p>
-      <Button variant="outline" size="lg" className="w-full text-sm" onClick={google}>Continue with Google</Button>
-      <div className="flex items-center gap-3 text-xs text-text-muted"><span className="h-px flex-1 bg-border" />or<span className="h-px flex-1 bg-border" /></div>
+      {googleOn && (
+        <>
+          <Button variant="outline" size="lg" className="w-full text-sm" onClick={google}>Continue with Google</Button>
+          <div className="flex items-center gap-3 text-xs text-text-muted"><span className="h-px flex-1 bg-border" />or<span className="h-px flex-1 bg-border" /></div>
+        </>
+      )}
       <form onSubmit={submit} noValidate className="space-y-3">
         <div>
           <label htmlFor={emailId} className="text-sm font-medium">Email</label>

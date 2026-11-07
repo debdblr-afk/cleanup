@@ -1,0 +1,167 @@
+import { copyFileSync, statSync } from "node:fs";
+import { attestBox, axe, card, expect, fixture, noHorizontalScroll, startWithSample, test, uploadFiles, waitPreviewReady } from "./helpers";
+
+test.describe("F01 guest cleans a video and grabs the free preview", () => {
+  test("F01-H1 sample clip → preview ready → download the 5 s preview", async ({ page }) => {
+    await page.goto("/");
+    await expect(page.getByRole("heading", { level: 1 })).toBeVisible();
+    await axe(page);
+    await startWithSample(page);
+    await expect(page.getByRole("heading", { name: /^Batch from/ })).toBeVisible();
+    await waitPreviewReady(page, /sample/i);
+    await axe(page);
+    const dl = page.waitForEvent("download");
+    await card(page, /sample/i).getByRole("link", { name: /Download 5 second preview/ }).click();
+    const file = await dl;
+    expect(file.suggestedFilename()).toMatch(/-cleaned-5s\.webm$/);
+    const size = statSync(await file.path()).size;
+    expect(size).toBeGreaterThan(20_000);
+  });
+
+  test("F01-H2 upload your own file with the rights box ticked", async ({ page }) => {
+    await page.goto("/");
+    await attestBox(page).check();
+    await uploadFiles(page, ["clip-a.webm"]);
+    await page.waitForURL(/\/b\//);
+    await waitPreviewReady(page, "clip-a.webm");
+    await expect(card(page, "clip-a.webm")).toContainText("360p");
+  });
+
+  test("F01-N1 rights box unticked: nothing uploads, the box is flagged", async ({ page }) => {
+    await page.goto("/");
+    await uploadFiles(page, ["clip-a.webm"]);
+    await expect(page.getByRole("alert").filter({ hasText: "Tick the box first" })).toBeVisible();
+    await expect(attestBox(page)).toBeFocused();
+    await expect(attestBox(page)).toHaveAttribute("aria-invalid", "true");
+    expect(page.url()).not.toMatch(/\/b\//);
+  });
+
+  test("F01-N2 a text file is refused with a clear message", async ({ page }) => {
+    await page.goto("/");
+    await attestBox(page).check();
+    await uploadFiles(page, ["notes.txt"]);
+    await expect(page.getByRole("alert").filter({ hasText: "isn't a video we can open" })).toBeVisible();
+  });
+
+  test("F01-N3 a damaged video is refused with a clear message", async ({ page }) => {
+    await page.goto("/");
+    await attestBox(page).check();
+    await uploadFiles(page, ["broken.mp4"]);
+    await expect(page.getByRole("alert").filter({ hasText: "couldn't be opened" })).toBeVisible();
+  });
+
+  test("F01-E1 a second visitor can't see the batch or its files", async ({ page, browser }) => {
+    await startWithSample(page);
+    await waitPreviewReady(page, /sample/i);
+    const batchUrl = page.url();
+    const previewHref = await card(page, /sample/i).getByRole("link", { name: /Download 5 second preview/ }).getAttribute("href");
+    const other = await browser.newContext();
+    const p2 = await other.newPage();
+    await p2.goto(batchUrl);
+    await expect(p2.getByRole("heading", { name: "This batch isn't here" })).toBeVisible();
+    await expect(p2.getByText(/browser that added them/)).toHaveCount(0); // BUG-004: stale copy from the fake data layer
+    const res = await p2.request.get(previewHref!, { maxRedirects: 0 });
+    expect([401, 403, 404]).toContain(res.status());
+    await other.close();
+  });
+
+  test("F01-E2a refresh while it's uploading: the card says so and can be removed (BUG-002)", async ({ page }) => {
+    // Hold the upload open so the refresh lands mid-upload.
+    await page.route("**/storage/v1/object/upload/sign/**", () => { /* never answer */ });
+    await startWithSample(page);
+    await expect(card(page, /sample/i).getByText("Saving the file")).toBeVisible();
+    await page.unroute("**/storage/v1/object/upload/sign/**");
+    await page.reload();
+    const c = card(page, /sample/i);
+    await expect(c.getByText("Upload stopped")).toBeVisible({ timeout: 45_000 });
+    await c.getByRole("button", { name: "Remove", exact: true }).click();
+    await expect(page.getByRole("article")).toHaveCount(0);
+    await expect(page.getByText(/0 of 30 videos/)).toBeVisible();
+  });
+
+  test("F01-E2b refresh while it's cleaning: the card still finishes (BUG-003)", async ({ page }) => {
+    await startWithSample(page);
+    await expect(card(page, /sample/i).getByText(/Finding the watermark|Cleaning the 5 s preview/).first()).toBeVisible({ timeout: 60_000 });
+    await page.reload();
+    await waitPreviewReady(page, /sample/i);
+  });
+
+  test("F01-E3 cancel while cleaning, then try again", async ({ page }) => {
+    await page.goto("/");
+    await attestBox(page).check();
+    await uploadFiles(page, ["clip-b.webm"]);
+    await page.waitForURL(/\/b\//);
+    const c = card(page, "clip-b.webm");
+    await c.getByRole("button", { name: "Cancel" }).click({ timeout: 30_000 });
+    await expect(c.getByText("Canceled")).toBeVisible();
+    await c.getByRole("button", { name: "Try again" }).click();
+    await waitPreviewReady(page, "clip-b.webm");
+  });
+
+  test("F01-E3b cancel in the last moments of cleaning: the card says Canceled (BUG-010)", async ({ page }) => {
+    await startWithSample(page);
+    const c = card(page, /sample/i);
+    await expect(c.getByText(/Cleaning the 5 s preview · (8\d|9\d)%/)).toBeVisible({ timeout: 60_000 });
+    await c.getByRole("button", { name: "Cancel" }).click();
+    await expect(c.getByText(/^(Canceled|Preview ready)$/)).toBeVisible();
+    await page.waitForTimeout(3000);
+    await expect(c.getByText(/Cleaning the 5 s preview/)).toHaveCount(0);
+  });
+
+  test("F01-E4 a 70-character name with accents and emoji fits its card at 390 px", async ({ page }, info) => {
+    const long = "Été à Montréal 🎬 démo finale v2 – coupe longue pour Instagram et TikTok.webm";
+    const target = info.outputPath(long);
+    copyFileSync(fixture("clip-a.webm"), target);
+    await page.setViewportSize({ width: 390, height: 844 });
+    await page.goto("/");
+    await noHorizontalScroll(page);
+    await attestBox(page).check();
+    await page.locator('input[type="file"]').first().setInputFiles(target);
+    await page.waitForURL(/\/b\//);
+    await expect(card(page, long)).toBeVisible();
+    await noHorizontalScroll(page);
+    await waitPreviewReady(page, long);
+    await noHorizontalScroll(page);
+    await axe(page);
+  });
+
+  test("F01-E5 the daily cap: a guest's 4th video waits for tomorrow", async ({ page }, info) => {
+    const names = ["one.webm", "two.webm", "three.webm", "four.webm"].map((n) => { const p = info.outputPath(n); copyFileSync(fixture("clip-a.webm"), p); return p; });
+    await page.goto("/");
+    await attestBox(page).check();
+    await page.locator('input[type="file"]').first().setInputFiles(names);
+    await page.waitForURL(/\/b\//);
+    await expect(page.getByRole("article")).toHaveCount(4);
+    for (const n of ["one.webm", "two.webm", "three.webm"]) await waitPreviewReady(page, n);
+    await expect(card(page, "four.webm")).toContainText("No previews left today");
+    await expect(card(page, "four.webm").getByRole("button", { name: "Clean it" })).toHaveCount(0);
+  });
+
+  test("F01-E6 keyboard only: tick the box and start the sample", async ({ page }) => {
+    await page.goto("/");
+    const box = attestBox(page);
+    for (let i = 0; i < 25 && !(await box.evaluate((el) => el === document.activeElement)); i++) await page.keyboard.press("Tab");
+    await expect(box).toBeFocused();
+    await page.keyboard.press("Space");
+    await expect(box).toBeChecked();
+    const sample = page.getByRole("button", { name: /Try a sample/ });
+    for (let i = 0; i < 25 && !(await sample.evaluate((el) => el === document.activeElement)); i++) await page.keyboard.press("Shift+Tab");
+    await expect(sample).toBeFocused();
+    await page.keyboard.press("Enter");
+    await page.waitForURL(/\/b\//, { timeout: 60_000 });
+  });
+
+  test("F01-E7 double click on the sample button makes one video", async ({ page }) => {
+    await page.goto("/");
+    await page.getByRole("button", { name: /Try a sample/ }).dblclick();
+    await page.waitForURL(/\/b\//, { timeout: 60_000 });
+    await page.waitForTimeout(1500);
+    await expect(page.getByRole("article")).toHaveCount(1);
+  });
+});
+
+test("F01-E8 the landing FAQ describes where files really go (BUG-005)", async ({ page }) => {
+  await page.goto("/");
+  await expect(page.getByText(/never uploaded/)).toHaveCount(0);
+  await expect(page.getByText(/private storage that only your account can reach/)).toBeAttached();
+});

@@ -21,7 +21,10 @@ npm run dev               # or the "cleanup" entry in ../.claude/launch.json (po
 ```bash
 npm test                  # unit: quota, masks, plans, the fill and the detector
 npm run test:api          # end to end against the dev server: every route, access rules with two users, Stripe webhooks, crons
+npm run e2e               # Playwright: every flow in a real browser, with axe, console and 5xx checks (report in e2e/.report)
 ```
+
+First time only: `npx playwright install chromium`. The test plan and bug reports are in `../replica-watermark/test-plan.md` and `bugs.md`.
 
 ## How it fits together
 
