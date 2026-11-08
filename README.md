@@ -18,7 +18,7 @@ npm run dev               # or the "cleanup" entry in ../.claude/launch.json (po
 
 ## Deploying
 
-Every step from zero to a live site on free plans (Vercel, Supabase, Cloudflare R2, your domain) is in [DEPLOY.md](DEPLOY.md).
+Every step from zero to a live site on free plans (Vercel, Supabase, Cloudflare R2, your domain) is in [DEPLOY.md](DEPLOY.md). [DEPLOY-WITH-AI.md](DEPLOY-WITH-AI.md) is the same, written to paste into any AI chatbot so it guides you step by step.
 
 ## Tests
 
