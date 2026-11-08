@@ -1,0 +1,15 @@
+# Only the website goes to Vercel. Never local secrets, tests, the Mac app or the worker.
+.env*
+!.env.example
+node_modules
+.next
+.next-build
+desktop
+e2e
+scripts
+worker
+supabase/.temp
+supabase/.branches
+playwright.config.ts
+vitest.config.ts
+tsconfig.tsbuildinfo
