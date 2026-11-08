@@ -12,6 +12,7 @@ Every step, in order, exactly as it worked on 2026-11-08 for https://cleanup.dbd
 | Your address | your domain's DNS (here BigRock) | one CNAME record |
 
 **How the app behaves once deployed:**
+- **The whole site is behind a passcode** (`SITE_PASSCODE`); there are **no logins**. Visitors are anonymous guests; their videos belong to their browser.
 - There are no plans or payments. Everyone, guests included, gets: videos up to 30 minutes and 4 GB, 100 previews a day, unlimited full exports up to 4K (never above the source).
 - Exports are made in the visitor's browser tab, with the original sound. A 30-minute video takes about 30 minutes with the tab open.
 - **Every file is deleted 7 days after upload**, by a daily cleanup job (03:00 UTC, set in `vercel.json`). An optional R2 rule (step 4.8) is the backup.
@@ -127,7 +128,7 @@ Alternative, from Terminal: `npx supabase login`, then `npx supabase link --proj
 
 `.vercelignore` keeps local secrets, tests and the server worker out of the upload. Its patterns start with `/` on purpose: a bare `worker` would also drop the website's `app/api/worker/` routes. That happened once and left previews stuck on "Waiting".
 
-## 6. Vercel settings: 11 environment variables
+## 6. Vercel settings: 12 environment variables
 
 **Seven that aren't secret.** You can add these from Terminal; paste each line and replace the `<…>` parts:
 ```bash
@@ -140,19 +141,20 @@ printf '%s' 'cleanup-media' | npx vercel env add S3_BUCKET production
 printf '%s' "$(openssl rand -hex 32)" | npx vercel env add CRON_SECRET production
 ```
 
-**Four you paste in the dashboard:** go to **vercel.com → cleanup → Settings → Environment Variables → Add Environment Variable**, with Environment **Production**:
+**Five you paste in the dashboard:** go to **vercel.com → cleanup → Settings → Environment Variables → Add Environment Variable**, with Environment **Production**:
 
 | Key | Value from | Type |
 | --- | --- | --- |
 | `SUPABASE_SERVICE_ROLE_KEY` | Supabase **service_role secret** | **Secret** |
 | `S3_ACCESS_KEY_ID` | R2 **Access Key ID** | **Secret** |
 | `S3_SECRET_ACCESS_KEY` | R2 **Secret Access Key** | **Secret** |
+| `SITE_PASSCODE` | the passcode visitors must type | **Secret** |
 | `NEXT_PUBLIC_SUPABASE_ANON_KEY` | Supabase **anon public** | **Config** (not Secret) |
 
 - Vercel refuses **Secret** for any `NEXT_PUBLIC_…` name ("Remove the public framework prefix…"), because those values go to browsers by design. Add the anon key separately as **Config**. That's correct: the anon key is public, and the access rules protect the data.
 - **Leave unset:** `NEXT_PUBLIC_EXPORT_WORKER` (so exports happen in the browser with sound), `NEXT_PUBLIC_MAX_UPLOAD_MB` (R2 takes up to 5 GB), and the Resend, Google and worker settings.
 
-Check all 11 are there:
+Check all 12 are there:
 ```bash
 npx vercel env ls production
 ```
@@ -165,7 +167,7 @@ npx vercel deploy --prod --yes
 After about 2 minutes it prints **Production URL: https://<name>.vercel.app**.
 
 1. Add that address to the R2 CORS policy (step 4.4), next to cleanup.dbdd.in.
-2. Open it, click **No video handy? Try a sample**, and wait for **Preview ready** on the card.
+2. Open it, enter the **passcode**, then click **No video handy? Try a sample**, and wait for **Preview ready** on the card.
 3. If the card stays on **Waiting**, open the browser's developer tools → Network: `/api/worker/claim` must not be a 404 (see Troubleshooting).
 
 ## 8. Your domain: cleanup.dbdd.in
@@ -195,11 +197,12 @@ After about 2 minutes it prints **Production URL: https://<name>.vercel.app**.
 
 ## 9. Final check on the live site
 
+- The **"Enter the passcode"** page comes first; a wrong passcode is refused, the right one opens the site.
 - Upload a short video with sound; it reaches **Preview ready**.
 - Export at 720p and download it; it plays at full length **with sound**.
 - `/pricing` sends you to the home page; on a phone, nothing scrolls sideways.
 - The batch page shows **"kept until"** a date 7 days after upload.
-- Optional: **Save work** with your email; the link arrives and signs you in. Supabase's built-in sender only sends a few emails an hour.
+- There's no "Log in" button, and `/login` goes to the home page.
 
 ---
 
@@ -233,3 +236,4 @@ After about 2 minutes it prints **Production URL: https://<name>.vercel.app**.
 | DNS | BigRock: CNAME `cleanup` → `9c69b23c5db9d688.vercel-dns-017.com` |
 | HTTPS | Let's Encrypt via Vercel, renews automatically |
 | Retention | 7 days (`retentionDays` in `lib/plans.ts`); cleanup job daily at 03:00 UTC |
+| Access | passcode gate (`SITE_PASSCODE`, Secret on Vercel); no logins. Change or delete it in Vercel settings, then redeploy |

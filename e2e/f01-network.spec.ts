@@ -1,4 +1,4 @@
-import { attestBox, card, expect, startWithSample, test, uploadFiles, waitPreviewReady } from "./helpers";
+import { attestBox, card, enterGate, expect, startWithSample, test, uploadFiles, waitPreviewReady } from "./helpers";
 
 test.describe("F01 network and session edge cases", () => {
   test("F01-E9 offline: adding a video fails with a message, nothing crashes", async ({ page, context }) => {
@@ -31,6 +31,7 @@ test.describe("F01 network and session edge cases", () => {
     const batch = page.url();
     await context.clearCookies();
     await page.evaluate(() => localStorage.clear());
+    await enterGate(page); // clearing cookies also cleared the passcode cookie
     await page.reload();
     await expect(page.getByRole("heading", { name: "This batch isn't here" })).toBeVisible();
     await page.getByRole("link", { name: "Start a new batch" }).click();

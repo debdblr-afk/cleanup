@@ -60,21 +60,11 @@ function Account() {
       <aside className="space-y-6">
         <section className="rounded-xl border border-border p-5 space-y-3" aria-labelledby="acct-h">
           <h2 id="acct-h" className="text-lg">Account</h2>
-          {!profile ? (
-            <p className="text-sm text-text-muted">You&apos;re not signed in. Upload a video to start as a guest, or <Link href="/login" className="text-accent underline">sign in</Link>.</p>
-          ) : profile.isAnonymous ? (
-            <>
-              <p className="text-sm text-text-muted">You&apos;re using a guest session. Add your email to keep your batches and come back to them from any device.</p>
-              <Link href="/login" className={buttonClass("primary", "md")}>Save my work</Link>
-            </>
-          ) : (
-            <>
-              <p className="text-sm">Signed in as <strong className="break-all">{profile.email}</strong></p>
-              <div className="flex flex-wrap gap-2">
-                <Button variant="outline" size="sm" onClick={async () => { await signOut(false); router.push("/"); }}>Sign out</Button>
-                <Button variant="ghost" size="sm" onClick={async () => { await signOut(true); toast("Signed out on every device"); router.push("/"); }}>Sign out everywhere</Button>
-              </div>
-            </>
+          <p className="text-sm text-text-muted">There are no logins. Your videos belong to this browser: they stay here for 7 days, and another browser or device starts fresh. Download the results you want to keep.</p>
+          {profile && !profile.isAnonymous && (
+            <div className="flex flex-wrap gap-2">
+              <Button variant="outline" size="sm" onClick={async () => { await signOut(false); router.push("/"); }}>Sign out</Button>
+            </div>
           )}
         </section>
 

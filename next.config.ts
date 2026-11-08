@@ -5,7 +5,11 @@ const nextConfig: NextConfig = {
   distDir: process.env.NEXT_DIST_DIR || ".next",
   // There are no plans to pick any more; old links to the pricing page go home.
   async redirects() {
-    return [{ source: "/pricing", destination: "/", permanent: false }];
+    return [
+      { source: "/pricing", destination: "/", permanent: false },
+      // Email login is switched off; the site sits behind a passcode instead.
+      { source: "/login", destination: "/", permanent: false },
+    ];
   },
 };
 

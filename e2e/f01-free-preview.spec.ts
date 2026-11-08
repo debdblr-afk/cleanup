@@ -1,5 +1,5 @@
 import { copyFileSync, statSync } from "node:fs";
-import { attestBox, axe, card, expect, fixture, noHorizontalScroll, startWithSample, test, uploadFiles, waitPreviewReady } from "./helpers";
+import { attestBox, axe, card, enterGate, expect, fixture, noHorizontalScroll, startWithSample, test, uploadFiles, waitPreviewReady } from "./helpers";
 
 test.describe("F01 guest cleans a video and grabs the free preview", () => {
   test("F01-H1 sample clip → preview ready → download the 5 s preview", async ({ page }) => {
@@ -66,9 +66,11 @@ test.describe("F01 guest cleans a video and grabs the free preview", () => {
     const previewHref = await card(page, /sample/i).getByRole("link", { name: /Download 5 second preview/ }).getAttribute("href");
     const other = await browser.newContext();
     const p2 = await other.newPage();
+    await enterGate(p2); // the second visitor knows the passcode but isn't the owner
     await p2.goto(batchUrl);
     await expect(p2.getByRole("heading", { name: "This batch isn't here" })).toBeVisible();
-    await expect(p2.getByText(/browser that added them/)).toHaveCount(0); // BUG-004: stale copy from the fake data layer
+    // No logins: videos belong to the browser that added them, and the page says so.
+    await expect(p2.getByText(/made in another browser/)).toBeVisible();
     const res = await p2.request.get(previewHref!, { maxRedirects: 0 });
     expect([401, 403, 404]).toContain(res.status());
     await other.close();

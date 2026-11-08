@@ -4,6 +4,11 @@ import path from "node:path";
 
 export const fixture = (name: string) => path.join(__dirname, ".fixtures", name);
 
+/** With the passcode gate on, enter it for this page's browser context (new contexts, cleared cookies). */
+export async function enterGate(page: Page) {
+  if (process.env.SITE_PASSCODE) await page.request.post("/api/enter", { data: { passcode: process.env.SITE_PASSCODE } });
+}
+
 /**
  * Every test fails on a console error from the app or any 5xx response.
  * Expected 4xx answers (a refused export, a signed-out file request) log a
@@ -11,6 +16,10 @@ export const fixture = (name: string) => path.join(__dirname, ".fixtures", name)
  */
 export const test = base.extend<{ guard: void }>({
   guard: [async ({ page }, use, info) => {
+    // With the passcode gate on (SITE_PASSCODE set), enter it once so the test starts inside.
+    if (process.env.SITE_PASSCODE && !info.title.startsWith("GATE")) {
+      await page.request.post("/api/enter", { data: { passcode: process.env.SITE_PASSCODE } });
+    }
     const problems: string[] = [];
     // A test can allow a known 5xx with test.info().annotations.push({ type: "allow-5xx", description: "/api/..." }).
     const allowed = (url: string) => info.annotations.some((a) => a.type === "allow-5xx" && a.description && url.includes(a.description));
