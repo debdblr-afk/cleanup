@@ -19,7 +19,7 @@ const FEATURES = [
 const FAQ = [
   { q: "Whose videos can I clean?", a: "Your own, or ones you have permission to edit. Cleanup is for removing your old branding, burned-in captions and stray text, not for taking someone else's watermark off their work. Rights holders can report misuse on the takedown page." },
   { q: "Does it work on moving watermarks?", a: "Static marks work today. Tracking marks that drift across the frame comes with the GPU engine. Until then, draw an erase zone over the area they move through." },
-  { q: "Where do my files go?", a: "To private storage that only your account can reach, through links that expire after a few minutes. Videos are deleted automatically after 1 to 30 days depending on your plan, and you can delete them, or your whole account, any time from the Your videos page. They're never used to train models." },
+  { q: "Where do my files go?", a: "To private storage that only your account can reach, through links that expire after a few minutes. Videos and results are deleted automatically 7 days after upload, so download what you want to keep. You can delete them sooner, or your whole account, any time from the Your videos page. They're never used to train models." },
   { q: "What does it cost?", a: "Nothing while Cleanup is in testing, and no account is needed. You get videos up to 30 minutes, 100 previews a day and unlimited full exports, in up to 4K (never above your video's own resolution), with the original sound." },
 ];
 

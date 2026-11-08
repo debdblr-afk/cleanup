@@ -64,6 +64,8 @@ try {
   check("no session -> 401", unauth.status === 401);
   const batch = (await call(A, "POST", "/api/batches")).json.batch;
   check("create batch", !!batch?.id);
+  const keptDays = (new Date(batch.expiresAt).getTime() - Date.now()) / 86_400_000;
+  check("files are kept 7 days", keptDays > 6.9 && keptDays <= 7.01, keptDays.toFixed(3));
   const bad = await call(A, "POST", "/api/videos", { batchId: batch.id, filename: "x.exe", contentType: "application/x-msdownload", sizeBytes: 10, attest: true, attestationVersion: "v" });
   check("wrong type -> 400", bad.status === 400);
   const noAttest = await call(A, "POST", "/api/videos", { batchId: batch.id, filename: "a.webm", contentType: "video/webm", sizeBytes: 10, attestationVersion: "v" });

@@ -29,7 +29,7 @@ export const PLANS: Record<PlanId, Plan> = {
   guest: { id: "guest", name: "Guest", pitch: "No account needed", previewsPerDay: 3, exportsPerDay: 0, maxDurationMs: 1 * MIN, maxBytes: capped(500 * MB), maxResolution: null, retentionDays: 1, monthly: null, yearlyPerMonth: null },
   free: { id: "free", name: "Free", pitch: "Try it on short clips", previewsPerDay: 5, exportsPerDay: 0, maxDurationMs: 2 * MIN, maxBytes: capped(1024 * MB), maxResolution: null, retentionDays: 3, monthly: 0, yearlyPerMonth: 0 },
   plus: { id: "plus", name: "Plus", pitch: "For weekly posting", previewsPerDay: 30, exportsPerDay: 10, maxDurationMs: 10 * MIN, maxBytes: capped(2048 * MB), maxResolution: "1080p", retentionDays: 14, monthly: 12, yearlyPerMonth: 9 },
-  pro: { id: "pro", name: "Pro", pitch: "For teams and agencies", previewsPerDay: 100, exportsPerDay: Infinity, maxDurationMs: 30 * MIN, maxBytes: capped(4096 * MB), maxResolution: "2160p", retentionDays: 30, monthly: 32, yearlyPerMonth: 24 },
+  pro: { id: "pro", name: "Pro", pitch: "For teams and agencies", previewsPerDay: 100, exportsPerDay: Infinity, maxDurationMs: 30 * MIN, maxBytes: capped(4096 * MB), maxResolution: "2160p", retentionDays: 7, monthly: 32, yearlyPerMonth: 24 },
 };
 
 /** Everyone gets this plan's limits: there are no paid tiers (owner's decision, 2026-11-07). */
