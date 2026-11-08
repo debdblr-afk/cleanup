@@ -1,11 +1,10 @@
-# Only the website goes to Vercel. Never local secrets, tests, the Mac app or the worker.
+# Only the website goes to Vercel. Never local secrets, tests or the worker.
 # Leading "/" = only the top-level folder (a bare "worker" would also drop app/api/worker).
 .env*
 !.env.example
 node_modules
 /.next
 /.next-build
-/desktop
 /e2e
 /scripts
 /worker

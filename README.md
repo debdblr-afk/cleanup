@@ -40,20 +40,6 @@ npm run worker            # needs WORKER_SECRET and APP_URL in .env.local, same 
 - Leave `NEXT_PUBLIC_EXPORT_WORKER` empty to go back to rendering exports in the tab (WebM, no sound).
 - Previews still render in the tab. The GPU model (tracking moving marks, better fills) plugs in here later.
 
-## Mac app
-
-`desktop/` builds **Cleanup.app** and a `.dmg` (Electron, the same Chromium engine the tests use). It opens your local copy when it's running on this Mac, otherwise https://cleanup.dbdd.in, or a "not reachable" page with Try again. Exports keep rendering while the window is minimised.
-
-```bash
-cd desktop
-npm install
-npm run icon     # build/icon.icns from app/icon.svg
-npm run dist     # dist/Cleanup-<version>-arm64.dmg (Apple silicon, unsigned)
-node smoke.mjs   # drives the built app: local copy, sample clean, offline page
-```
-
-It's unsigned: on another Mac, open it with right-click → Open the first time (signing and notarising need an Apple Developer account). Sign-in links from email open in your browser, not the app; guests can use everything in the app.
-
 ## How it fits together
 
 - **Reads:** row level security plus Supabase Realtime. **Writes:** `app/api/*`, with ownership, plan limits and daily caps checked on the server.
