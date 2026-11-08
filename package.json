@@ -15,7 +15,8 @@
     "db:reset": "supabase db reset",
     "test:api": "node --env-file=.env.local scripts/test-api.mjs",
     "e2e": "playwright test",
-    "worker": "node --env-file=.env.local worker/index.mjs"
+    "worker": "node --env-file=.env.local worker/index.mjs",
+    "db:hosted-sql": "node scripts/hosted-sql.mjs"
   },
   "dependencies": {
     "@aws-sdk/client-s3": "^3.1164.0",

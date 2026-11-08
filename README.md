@@ -16,6 +16,10 @@ npm run dev               # or the "cleanup" entry in ../.claude/launch.json (po
 - Sign-in emails go to Mailpit: http://127.0.0.1:55324
 - Database UI (Studio): http://127.0.0.1:55323
 
+## Deploying
+
+Every step from zero to a live site on free plans (Vercel, Supabase, Cloudflare R2, your domain) is in [DEPLOY.md](DEPLOY.md).
+
 ## Tests
 
 ```bash

@@ -49,3 +49,6 @@ next-env.d.ts
 /e2e/.report/
 /e2e/.fixtures/
 
+
+# built by npm run db:hosted-sql
+/supabase/hosted-setup.sql
