@@ -92,3 +92,13 @@ describe("format", () => {
     expect([1, 2, 3, 4, 11, 12, 13, 21, 22].map(ordinal)).toEqual(["1st", "2nd", "3rd", "4th", "11th", "12th", "13th", "21st", "22nd"]);
   });
 });
+
+describe("retention", () => {
+  it("keeps files 3 days and counts from upload, even when the stored expiry is later", async () => {
+    const { keptUntil, RETENTION_DAYS } = await import("./plans");
+    expect(RETENTION_DAYS).toBe(3);
+    const created = "2026-11-01T10:00:00.000Z";
+    expect(keptUntil(created, "2026-12-01T10:00:00.000Z").toISOString()).toBe("2026-11-04T10:00:00.000Z");
+    expect(keptUntil(created, "2026-11-02T10:00:00.000Z").toISOString()).toBe("2026-11-02T10:00:00.000Z");
+  });
+});

@@ -15,7 +15,7 @@ Every step, in order, exactly as it worked on 2026-11-08 for https://cleanup.dbd
 - **The whole site is behind a passcode** (`SITE_PASSCODE`); there are **no logins**. Visitors are anonymous guests; their videos belong to their browser.
 - There are no plans or payments. Everyone, guests included, gets: videos up to 30 minutes and 4 GB, 100 previews a day, unlimited full exports up to 4K (never above the source).
 - Exports are made in the visitor's browser tab, with the original sound. A 30-minute video takes about 30 minutes with the tab open.
-- **Every file is deleted 7 days after upload**, by a daily cleanup job (03:00 UTC, set in `vercel.json`). An optional R2 rule (step 4.8) is the backup.
+- **Every file is deleted 3 days after upload**, by a daily cleanup job (03:00 UTC, set in `vercel.json`). The job judges by upload time, so changing `retentionDays` in `lib/plans.ts` also applies to videos already uploaded. An optional R2 rule (step 4.8) is the backup.
 
 **The rule throughout:** you create the accounts, sign in, and paste secret keys yourself. Never paste a secret key into chat, a document or a screenshot.
 
@@ -110,7 +110,7 @@ Alternative, from Terminal: `npx supabase login`, then `npx supabase link --proj
    - Click **Create Account API Token**.
 6. Copy the **Access Key ID** and **Secret Access Key** now; they're shown **once**. You don't need the "Token value" or the jurisdiction URL. If you lose them, delete the token and create a new one.
 7. Your R2 address is `https://<account-id>.r2.cloudflarestorage.com`. It's on the R2 overview page as **S3 API**.
-8. **Optional backup delete rule:** in the bucket, open **Settings → Object Lifecycle Rules → Add**. Name it `delete-after-8-days`, leave the prefix empty (all files), set **Delete objects after 8 days**, and **Save**. The app already deletes files at 7 days; this only catches anything left behind. Keep it at 8, not 7, so it never runs ahead of the app's own cleanup.
+8. **Optional backup delete rule:** in the bucket, open **Settings → Object Lifecycle Rules → Add**. Name it `delete-after-4-days`, leave the prefix empty (all files), set **Delete objects after 4 days**, and **Save**. The app already deletes files at 3 days; this only catches anything left behind. Keep it one day longer than the app's retention so it never runs ahead of the app's own cleanup (if you change retention, change this rule too).
 
 ## 5. Vercel project (about 5 minutes)
 
@@ -201,7 +201,7 @@ After about 2 minutes it prints **Production URL: https://<name>.vercel.app**.
 - Upload a short video with sound; it reaches **Preview ready**.
 - Export at 720p and download it; it plays at full length **with sound**.
 - `/pricing` sends you to the home page; on a phone, nothing scrolls sideways.
-- The batch page shows **"kept until"** a date 7 days after upload.
+- The batch page shows **"kept until"** a date 3 days after upload.
 - There's no "Log in" button, and `/login` goes to the home page.
 
 ---
@@ -235,5 +235,5 @@ After about 2 minutes it prints **Production URL: https://<name>.vercel.app**.
 | Cloudflare R2 | account `47999b7340e0bb157282dda7fa55d983`, bucket `cleanup-media`, token `cleanup-app` (Object Read & Write, this bucket only) |
 | DNS | BigRock: CNAME `cleanup` → `9c69b23c5db9d688.vercel-dns-017.com` |
 | HTTPS | Let's Encrypt via Vercel, renews automatically |
-| Retention | 7 days (`retentionDays` in `lib/plans.ts`); cleanup job daily at 03:00 UTC |
+| Retention | 3 days (`retentionDays` in `lib/plans.ts`, applies to existing videos too); cleanup job daily at 03:00 UTC |
 | Access | passcode gate (`SITE_PASSCODE`, Secret on Vercel); no logins. Change or delete it in Vercel settings, then redeploy |

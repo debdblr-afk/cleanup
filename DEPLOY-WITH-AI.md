@@ -29,7 +29,7 @@ You are guiding a non-expert through deploying a web app. Follow these rules exa
 - Videos upload **straight from the browser to Cloudflare R2** using short-lived signed URLs. The bucket is private.
 - Cleaning and exporting happen **in the visitor's browser tab** (canvas + MediaRecorder). Exports keep the **original sound** (WebM with Opus audio). A 30-minute export takes ~30 minutes with the tab open.
 - **No plans or payments.** Everyone gets: videos up to 30 min / 4 GB, 100 previews a day, **unlimited exports** up to 4K (never above the source).
-- **Every file is deleted 7 days after upload** by a daily cleanup job (Vercel Cron, 03:00 UTC). A second daily job (03:30 UTC) frees stalled work.
+- **Every file is deleted 3 days after upload** by a daily cleanup job (Vercel Cron, 03:00 UTC). It judges by upload time, so a retention change also applies to videos already uploaded. A second daily job (03:30 UTC) frees stalled work.
 
 **Services (all free tiers):**
 
@@ -45,7 +45,7 @@ You are guiding a non-expert through deploying a web app. Follow these rules exa
 - `vercel.json` — the two daily cron jobs.
 - `.vercelignore` — keeps local secrets, tests and the optional server worker out of the upload. **Its patterns start with `/` on purpose** (a bare `worker` would also exclude `app/api/worker/` and break the site).
 - `.env.example` — every setting name. `.env.local` is the person's local-only settings file (never uploaded).
-- `lib/plans.ts` — limits (`retentionDays: 7`, `exportsPerDay: Infinity`, etc.).
+- `lib/plans.ts` — limits (`retentionDays: 3`, `exportsPerDay: Infinity`, etc.). To change retention: edit `retentionDays` on the `pro` line, run the tests, redeploy, and adjust the R2 backup rule (Step 4.7) to one day longer.
 
 **The 12 production settings (environment variables) on Vercel:**
 
@@ -176,7 +176,7 @@ union all select 'migrations recorded', (select count(*)::text from supabase_mig
    - **TTL:** Forever · IP filtering: leave empty
    - **Create Account API Token**
 6. On the next page the person copies **Access Key ID** and **Secret Access Key** into the password manager — **shown only once**. (Token value and jurisdiction URL are not needed.) If lost: delete the token and create a new one.
-7. Optional backup delete rule: bucket → **Settings → Object Lifecycle Rules → Add** → name `delete-after-8-days`, prefix empty, **Delete objects after 8 days** → **Save**. (The app deletes at 7 days; 8 keeps the backup from running first.)
+7. Optional backup delete rule: bucket → **Settings → Object Lifecycle Rules → Add** → name `delete-after-4-days`, prefix empty, **Delete objects after 4 days** → **Save**. (The app deletes at 3 days; one day longer keeps the backup from running first.)
 
 ### Step 5 — Vercel login and project (5 min)
 
@@ -284,7 +284,7 @@ On `https://<your-domain>`:
 0. The **"Enter the passcode"** page appears first; a wrong passcode says "That passcode isn't right."; the right one opens the site.
 1. Tick the rights box, upload a short video **with sound** → **Preview ready**.
 2. Card → **Export** → dialog says **"Unlimited exports."** → **Export 720p** (keep the tab open) → **Download**. **Check:** the file plays at full length **with sound**.
-3. Batch page shows **"kept until"** a date **7 days** after upload.
+3. Batch page shows **"kept until"** a date **3 days** after upload.
 4. `https://<your-domain>/pricing` redirects to the home page (no plans).
 5. On a phone: the page fits the screen, nothing scrolls sideways.
 6. There is no "Log in" button, and `/login` goes to the home page (logins are switched off).
@@ -331,7 +331,7 @@ On `https://<your-domain>`:
 - [ ] 6 12 settings present (`vercel env ls production`), including SITE_PASSCODE
 - [ ] 7 Deployed; `<vercel-url>` added to CORS; sample reaches "Preview ready"
 - [ ] 8 Domain added; CNAME at DNS provider; public DNS shows it; HTTPS 200
-- [ ] 9 Live check: passcode page first, upload, preview, export with sound, "kept until" = +7 days, `/pricing` and `/login` → home, phone layout OK
+- [ ] 9 Live check: passcode page first, upload, preview, export with sound, "kept until" = +3 days, `/pricing` and `/login` → home, phone layout OK
 
 ---
 
@@ -345,5 +345,5 @@ On `https://<your-domain>`:
 | Cloudflare R2 | account `47999b7340e0bb157282dda7fa55d983`, bucket `cleanup-media`, token `cleanup-app` (Object Read & Write, this bucket only); CORS origins: cleanup.dbdd.in, cleanup-mu.vercel.app |
 | DNS | BigRock: CNAME `cleanup` → `9c69b23c5db9d688.vercel-dns-017.com` |
 | HTTPS | Let's Encrypt via Vercel, auto-renews |
-| Retention | 7 days; cleanup job daily 03:00 UTC (`vercel.json`) |
+| Retention | 3 days (by upload time); cleanup job daily 03:00 UTC (`vercel.json`) |
 | Access | passcode gate (`SITE_PASSCODE`, Secret on Vercel); no logins |

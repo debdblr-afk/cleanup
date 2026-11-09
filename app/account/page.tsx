@@ -9,6 +9,7 @@ import { toast } from "@/components/ui/toast";
 import { useStore } from "@/lib/data/hooks";
 import { deleteEverything, getPlan, getState, liveVideos, quotaStatus, signOut } from "@/lib/data/store";
 import { formatBytes, formatDuration } from "@/lib/format";
+import { keptUntil, RETENTION_DAYS } from "@/lib/plans";
 
 function Account() {
   const { hydrated } = useStore();
@@ -47,7 +48,7 @@ function Account() {
                     </div>
                     <span className="min-w-0">
                       <span className="block font-medium">{new Date(b.createdAt).toLocaleString(undefined, { dateStyle: "medium", timeStyle: "short" })}</span>
-                      <span className="block text-sm text-text-muted">{vids.length} video{vids.length === 1 ? "" : "s"} · kept until {new Date(b.expiresAt).toLocaleDateString(undefined, { dateStyle: "medium" })}</span>
+                      <span className="block text-sm text-text-muted">{vids.length} video{vids.length === 1 ? "" : "s"} · kept until {keptUntil(b.createdAt, b.expiresAt).toLocaleDateString(undefined, { dateStyle: "medium" })}</span>
                     </span>
                   </Link>
                 </li>
@@ -60,7 +61,7 @@ function Account() {
       <aside className="space-y-6">
         <section className="rounded-xl border border-border p-5 space-y-3" aria-labelledby="acct-h">
           <h2 id="acct-h" className="text-lg">Account</h2>
-          <p className="text-sm text-text-muted">There are no logins. Your videos belong to this browser: they stay here for 7 days, and another browser or device starts fresh. Download the results you want to keep.</p>
+          <p className="text-sm text-text-muted">There are no logins. Your videos belong to this browser: they stay here for {RETENTION_DAYS} days, and another browser or device starts fresh. Download the results you want to keep.</p>
           {profile && !profile.isAnonymous && (
             <div className="flex flex-wrap gap-2">
               <Button variant="outline" size="sm" onClick={async () => { await signOut(false); router.push("/"); }}>Sign out</Button>

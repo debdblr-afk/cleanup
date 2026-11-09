@@ -65,7 +65,7 @@ try {
   const batch = (await call(A, "POST", "/api/batches")).json.batch;
   check("create batch", !!batch?.id);
   const keptDays = (new Date(batch.expiresAt).getTime() - Date.now()) / 86_400_000;
-  check("files are kept 7 days", keptDays > 6.9 && keptDays <= 7.01, keptDays.toFixed(3));
+  check("files are kept 3 days", keptDays > 2.9 && keptDays <= 3.01, keptDays.toFixed(3));
   const bad = await call(A, "POST", "/api/videos", { batchId: batch.id, filename: "x.exe", contentType: "application/x-msdownload", sizeBytes: 10, attest: true, attestationVersion: "v" });
   check("wrong type -> 400", bad.status === 400);
   const noAttest = await call(A, "POST", "/api/videos", { batchId: batch.id, filename: "a.webm", contentType: "video/webm", sizeBytes: 10, attestationVersion: "v" });
@@ -247,11 +247,21 @@ try {
   }
 
   console.log("\nexpiry + account deletion");
+  // Retention is judged by upload time too: a video uploaded longer ago than the retention
+  // period goes even if its stored expiry is later (so shortening retention applies to old videos).
+  const oldBatch = (await call(A, "POST", "/api/batches")).json.batch;
+  const ov = (await call(A, "POST", "/api/videos", { batchId: oldBatch.id, filename: "old.webm", contentType: "video/webm", sizeBytes: tinyVideo.length, attest: true, attestationVersion: "2026-11-07" })).json;
+  await putTo(ov.upload, tinyVideo);
+  await admin.from("videos").update({ created_at: new Date(Date.now() - 4 * 86_400_000).toISOString(), expires_at: new Date(Date.now() + 30 * 86_400_000).toISOString() }).eq("id", ov.video.id);
+  await admin.from("batches").update({ created_at: new Date(Date.now() - 4 * 86_400_000).toISOString(), expires_at: new Date(Date.now() + 30 * 86_400_000).toISOString() }).eq("id", oldBatch.id);
   await admin.from("videos").update({ expires_at: new Date(Date.now() - 1000).toISOString() }).eq("id", video.id);
   const ex = await call(null, "GET", "/api/cron/expire", null, { authorization: `Bearer ${process.env.CRON_SECRET}` });
   const left = await listFiles(`u/${A.id}/${video.id}`);
   const vrow = (await admin.from("videos").select("status").eq("id", video.id).single()).data;
   check("expire deletes files and marks the video", ex.status === 200 && ex.json.videos >= 1 && left.length === 0 && vrow.status === "deleted", JSON.stringify(ex.json));
+  const oldLeft = await listFiles(`u/${A.id}/${ov.video.id}`);
+  const oldRow = (await admin.from("videos").select("status").eq("id", ov.video.id).maybeSingle()).data;
+  check("a video older than the retention period is deleted, whatever its stored expiry", oldLeft.length === 0 && (!oldRow || oldRow.status === "deleted"), JSON.stringify({ oldRow, files: oldLeft.length }));
   const del = await call(A, "DELETE", "/api/account");
   const gone = await admin.auth.admin.getUserById(A.id);
   const rows = (await admin.from("batches").select("id").eq("user_id", A.id)).data;

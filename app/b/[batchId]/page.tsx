@@ -10,7 +10,7 @@ import { buttonClass, EmptyState, Skeleton } from "@/components/ui/primitives";
 import { UploadPanel } from "@/components/upload/upload-panel";
 import { useStore } from "@/lib/data/hooks";
 import { getState, liveVideos } from "@/lib/data/store";
-import { BATCH_LIMIT } from "@/lib/plans";
+import { BATCH_LIMIT, keptUntil, RETENTION_DAYS } from "@/lib/plans";
 import type { Job } from "@/lib/types";
 
 export default function BatchPage() {
@@ -35,7 +35,7 @@ export default function BatchPage() {
       <div className="mx-auto max-w-[640px] px-4 py-16">
         <EmptyState
           icon={<Clapperboard />} title="This batch isn't here"
-          body="It may have expired or been removed, or it was made in another browser. Videos stay in the browser that added them, for 7 days."
+          body={`It may have expired or been removed, or it was made in another browser. Videos stay in the browser that added them, for ${RETENTION_DAYS} days.`}
           action={<Link href="/" className={buttonClass("primary", "md")}>Start a new batch</Link>}
         />
       </div>
@@ -51,7 +51,7 @@ export default function BatchPage() {
       <div className="flex flex-wrap items-end justify-between gap-3">
         <div>
           <h1 className="text-xl">Batch from {created}</h1>
-          <p className="text-sm text-text-muted tabnums">{videos.length} of {BATCH_LIMIT} videos · kept until {new Date(batch.expiresAt).toLocaleDateString(undefined, { dateStyle: "medium" })}</p>
+          <p className="text-sm text-text-muted tabnums">{videos.length} of {BATCH_LIMIT} videos · kept until {keptUntil(batch.createdAt, batch.expiresAt).toLocaleDateString(undefined, { dateStyle: "medium" })}</p>
         </div>
         {/* The header shows the meter from md up. */}
         <div className="md:hidden"><QuotaMeter /></div>
