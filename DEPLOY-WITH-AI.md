@@ -299,6 +299,7 @@ On `https://<your-domain>`:
 | --- | --- | --- |
 | Cards stay **"Waiting"**; browser Network tab shows `/api/worker/claim` → **404** | worker routes missing from upload | `.vercelignore` must contain `/worker` (with leading slash), not `worker`. Fix and redeploy. |
 | In **Safari**, the first clean works but later cards stay **"Waiting"** | an old version waited forever for Safari's audio permission (BUG-013, fixed 2026-11-09) | Make sure the latest code is deployed, then **reload the page**. A tab that's stuck keeps running the old code until you reload. To test Safari's engine locally: `npx playwright test --project=safari`. |
+| In **Safari**, the **"Cleaned"** side of the before/after view is **black** (or a downloaded `.webm` won't open) | an old version wrote the video length in a way Safari can't read (BUG-014, fixed 2026-11-09) | Deploy the latest code and **reload the page**, then clean the video again. Previews made before the fix stay unplayable in Safari but still play in Chrome; they're deleted after the 3-day retention anyway. |
 | Upload fails; console shows a **CORS** error | site origin not in R2 CORS | Add the exact `https://…` origin to the R2 CORS policy (Step 4.4 / 7.2). |
 | Sign-in email link opens **localhost** or is rejected | Supabase Site URL / Redirect URL not set | Step 3.2. |
 | Vercel: **"Remove the public framework prefix to keep this value private"** | a `NEXT_PUBLIC_` variable added as Secret | Remove that row, save the others, add it as **Config**. |

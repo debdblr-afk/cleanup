@@ -51,6 +51,20 @@ export function seek(v: HTMLVideoElement, t: number): Promise<void> {
   });
 }
 
+/** Wait (briefly) until the browser has a decoded frame to draw; Safari may draw black before that. */
+function paintedFrame(v: HTMLVideoElement): Promise<void> {
+  return new Promise((resolve) => {
+    const done = () => resolve();
+    setTimeout(done, 1500);
+    if (v.readyState >= 2 && !("requestVideoFrameCallback" in v)) return done();
+    if ("requestVideoFrameCallback" in v) {
+      (v as HTMLVideoElement & { requestVideoFrameCallback(cb: () => void): number }).requestVideoFrameCallback(done);
+    } else {
+      (v as HTMLVideoElement).addEventListener("loadeddata", done, { once: true });
+    }
+  });
+}
+
 export type Probe = { durationMs: number; width: number; height: number; thumbnail: string | null };
 
 export async function probe(blob: Blob): Promise<Probe> {
@@ -60,6 +74,7 @@ export async function probe(blob: Blob): Promise<Probe> {
     const durationMs = Math.round(v.duration * 1000);
     if (!v.videoWidth || !Number.isFinite(durationMs) || durationMs <= 0) throw new Error("corrupt");
     await seek(v, Math.min(0.5, v.duration / 2));
+    await paintedFrame(v);
     const tw = 320;
     const th = Math.round((tw * v.videoHeight) / v.videoWidth);
     const c = document.createElement("canvas");

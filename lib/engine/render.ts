@@ -4,11 +4,11 @@
 // The original sound is carried over: the video's audio is routed (not to the speakers) into
 // the recording, in sync because the video plays in real time.
 
-import fixWebmDuration from "fix-webm-duration";
 import { activeAt, rasterizeBrush, toPixels } from "../mask";
 import type { Mask } from "../types";
 import { runningAudioContext } from "./audio";
 import { fillMask, fillRect } from "./inpaint";
+import { setWebmDuration } from "./webm-duration";
 import { disposeVideo, loadVideo, pickRecorderType } from "./video";
 
 export type RenderOptions = {
@@ -192,7 +192,8 @@ export async function render(source: Blob, mask: Mask, opts: RenderOptions): Pro
     let blob = new Blob(chunks, { type: recordType.split(";")[0] });
     if (!blob.size) throw new RenderError("render_failed", "The recording came out empty.");
     // MediaRecorder leaves the length out of WebM files; write it in so players can show it and seek.
-    if (blob.type === "video/webm") blob = await fixWebmDuration(blob, endS * 1000, { logger: false }).catch(() => blob);
+    // (Only the Info block changes: Safari won't play files re-packed by fix-webm-duration, BUG-014.)
+    if (blob.type === "video/webm") blob = await setWebmDuration(blob, endS * 1000).catch(() => blob);
     opts.onProgress?.(100);
     return { blob, durationMs: Math.round(endS * 1000), width, height };
   } catch (e) {

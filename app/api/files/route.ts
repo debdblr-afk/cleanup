@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { db, fail, isResponse, requireUser } from "@/lib/server/http";
 import { uuid } from "@/lib/server/schemas";
-import { signedRead } from "@/lib/server/storage";
+import { signedRead, stat } from "@/lib/server/storage";
 
 // GET /api/files?kind=original|thumb|preview|result&id=...[&download=name]
 // Ownership check, then a redirect to a 10-minute signed URL. Files are never public.
@@ -28,7 +28,14 @@ export async function GET(req: Request) {
   if (!path) return fail(404, "not_found", "No such file.");
   let signed: string;
   try {
-    signed = await signedRead(path, 600, download);
+    // Name the download after what's stored: Safari records MP4, other browsers WebM.
+    let name = download;
+    if (name && (kind === "preview" || kind === "result")) {
+      const type = (await stat(path))?.type ?? "";
+      const ext = type.includes("mp4") ? "mp4" : type.includes("webm") ? "webm" : null;
+      if (ext) name = name.replace(/\.(webm|mp4)$/i, "") + "." + ext;
+    }
+    signed = await signedRead(path, 600, name);
   } catch {
     // The file is gone (removed or expired) though its record remains: "not found", not a crash.
     return fail(404, "not_found", "No such file.");

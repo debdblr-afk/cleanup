@@ -18,6 +18,15 @@ test.describe("F01 guest cleans a video and grabs the free preview", () => {
     expect(size).toBeGreaterThan(20_000);
   });
 
+  test("F01-H4 the cleaned preview actually plays in this browser (BUG-014)", async ({ page }) => {
+    await startWithSample(page);
+    await waitPreviewReady(page, /sample/i);
+    // Both players on the card (original and cleaned) must load without a media error.
+    await expect.poll(async () => page.evaluate(() => [...document.querySelectorAll<HTMLVideoElement>("article video")].map((v) => ({
+      ok: !v.error && v.readyState >= 2 && v.videoWidth > 0, error: v.error?.code ?? null,
+    }))), { timeout: 20_000 }).toEqual([{ ok: true, error: null }, { ok: true, error: null }]);
+  });
+
   test("F01-H2 upload your own file with the rights box ticked", async ({ page }) => {
     await page.goto("/");
     await attestBox(page).check();

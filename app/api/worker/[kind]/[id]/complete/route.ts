@@ -31,7 +31,7 @@ export async function POST(req: Request, { params }: { params: Promise<{ kind: s
     if (!file || !file.size) return fail(409, "missing_output", "The rendered file didn't arrive.");
     const patch = k === "jobs"
       ? { status: "done", progress: 100, preview_key: path, preview_ms: input.durationMs ?? null, finished_at: now, ...(input.detectedMask !== undefined ? { detected_mask: input.detectedMask } : {}) }
-      : { status: "done", progress: 100, result_key: path, size_bytes: file.size, finished_at: now };
+      : { status: "done", progress: 100, result_key: path, size_bytes: file.size, finished_at: now, format: file.type.includes("mp4") ? "mp4" : "webm" };
     await db().from(table).update(patch as never).eq("id", id).eq("worker_ref", input.workerId);
     return json({ ok: true });
   }

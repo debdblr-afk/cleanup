@@ -27,7 +27,6 @@
     "@supabase/ssr": "^0.12.7",
     "@supabase/supabase-js": "^2.119.0",
     "ffmpeg-static": "^5.3.0",
-    "fix-webm-duration": "^1.0.6",
     "lucide-react": "^0.468.0",
     "next": "15.5.29",
     "react": "19.1.0",
