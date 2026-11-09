@@ -23,7 +23,7 @@ Every step, in order, exactly as it worked on 2026-11-08 for https://cleanup.dbd
 
 ## 0. Before you start
 
-- The `cleanup` folder on your Mac, with Node.js 22 (`node -v`). Run `npm install` once in the folder.
+- The `cleanup` folder on your Mac, with Node.js 22 (`node -v`). Run `npm install` once in the folder. On a new Mac, get the folder from your private GitHub repo: install `gh` (`brew install gh`), sign in with `gh auth login --web`, then `gh repo clone debdblr-afk/cleanup`.
 - Accounts (all free): **Supabase**, **Cloudflare**, **Vercel**. Signing in with GitHub is quickest for Supabase and Vercel.
 - Access to your domain's DNS. For dbdd.in that's **BigRock** (`dns1–4.bigrock.in`).
 - A password manager or private note, for the keys you copy along the way.
@@ -232,6 +232,7 @@ After about 2 minutes it prints **Production URL: https://<name>.vercel.app**.
 | | |
 | --- | --- |
 | Live site | https://cleanup.dbdd.in (also https://cleanup-mu.vercel.app) |
+| Code | private GitHub repo https://github.com/debdblr-afk/cleanup (branch `main`). Vercel isn't linked to it: deploys go from the Mac with `npx vercel deploy --prod`. After committing, `git push` keeps GitHub current |
 | Vercel | account `debdblr-7151`, project `debdblr-7151s-projects/cleanup`, Hobby |
 | Supabase | project `cleanup`, ref `oqrqksjbbafhaecrszvj`, South Asia (Mumbai), Free |
 | Cloudflare R2 | account `47999b7340e0bb157282dda7fa55d983`, bucket `cleanup-media`, token `cleanup-app` (Object Read & Write, this bucket only) |

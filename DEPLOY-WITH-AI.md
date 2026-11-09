@@ -21,7 +21,7 @@ You are guiding a non-expert through deploying a web app. Follow these rules exa
 
 ## PART B — What is being deployed (context for the AI)
 
-**The app:** "Cleanup" removes the user's own logos, captions and stray text from their videos. Next.js 15 (App Router, TypeScript) web app in the folder `cleanup/`. No GitHub repository is required.
+**The app:** "Cleanup" removes the user's own logos, captions and stray text from their videos. Next.js 15 (App Router, TypeScript) web app in the folder `cleanup/`. The code is also in the person's private GitHub repo (`debdblr-afk/cleanup`), but deploying doesn't need GitHub: the Vercel CLI uploads from the folder.
 
 **How it works:**
 - **The whole site is behind a passcode** (`SITE_PASSCODE`). Visitors see an "Enter the passcode" page first; the right passcode sets a signed cookie for 30 days. Cron and worker routes stay open (they have their own secrets).
@@ -81,7 +81,11 @@ Replace placeholders in angle brackets: `<project-ref>`, `<cloudflare-account-id
    node -v
    ```
    **Check:** prints `v22.x` (v20+ also works).
-2. Open Terminal and go to the project folder (adjust the path if different):
+2. If the `cleanup` folder isn't on this Mac, get it from the person's private GitHub repo (they sign in themselves when the browser opens):
+   ```bash
+   brew install gh && gh auth login --web && gh repo clone debdblr-afk/cleanup ~/Desktop/CRM/cleanup
+   ```
+   Then open Terminal and go to the project folder (adjust the path if different):
    ```bash
    cd ~/Desktop/CRM/cleanup
    ```
@@ -342,6 +346,7 @@ On `https://<your-domain>`:
 | | |
 | --- | --- |
 | Live site | https://cleanup.dbdd.in (also https://cleanup-mu.vercel.app) |
+| Code | private GitHub repo https://github.com/debdblr-afk/cleanup (branch `main`). Vercel isn't linked to it: deploys go from the Mac with `npx vercel deploy --prod`. After committing, `git push` keeps GitHub current |
 | Vercel | account `debdblr-7151`, project `debdblr-7151s-projects/cleanup`, Hobby |
 | Supabase | project `cleanup`, ref `oqrqksjbbafhaecrszvj`, South Asia (Mumbai), Free |
 | Cloudflare R2 | account `47999b7340e0bb157282dda7fa55d983`, bucket `cleanup-media`, token `cleanup-app` (Object Read & Write, this bucket only); CORS origins: cleanup.dbdd.in, cleanup-mu.vercel.app |
