@@ -77,6 +77,11 @@ async function api<T>(path: string, init: { method?: string; body?: unknown } = 
   const data = await res.json().catch(() => ({}));
   if (!res.ok) {
     const e = (data as { error?: { code?: string; message?: string } }).error ?? {};
+    // The passcode entry ran out (after GATE_HOURS) while this tab was open: back to the passcode page.
+    if (res.status === 401 && e.code === "passcode" && typeof window !== "undefined" && !window.location.pathname.startsWith("/enter")) {
+      const here = window.location.pathname + window.location.search;
+      window.location.replace(`/enter?${new URLSearchParams({ ...(here !== "/" && { next: here }), expired: "1" })}`);
+    }
     throw new ApiError(res.status, e.code ?? "error", e.message ?? "Something went wrong.", e as Record<string, unknown>);
   }
   return data as T;

@@ -12,7 +12,7 @@ Every step, in order, exactly as it worked on 2026-11-08 for https://cleanup.dbd
 | Your address | your domain's DNS (here BigRock) | one CNAME record |
 
 **How the app behaves once deployed:**
-- **The whole site is behind a passcode** (`SITE_PASSCODE`); there are **no logins**. Visitors are anonymous guests; their videos belong to their browser.
+- **The whole site is behind a passcode** (`SITE_PASSCODE`); the passcode has to be entered again **6 hours** after it was last entered (`GATE_HOURS` in `lib/gate.ts`); there are **no logins**. Visitors are anonymous guests; their videos belong to their browser.
 - There are no plans or payments. Everyone, guests included, gets: videos up to 30 minutes and 4 GB, 100 previews a day, unlimited full exports up to 4K (never above the source).
 - Exports are made in the visitor's browser tab, with the original sound. A 30-minute video takes about 30 minutes with the tab open.
 - **Every file is deleted 3 days after upload**, by a daily cleanup job (03:00 UTC, set in `vercel.json`). The job judges by upload time, so changing `retentionDays` in `lib/plans.ts` also applies to videos already uploaded. An optional R2 rule (step 4.8) is the backup.
@@ -197,7 +197,7 @@ After about 2 minutes it prints **Production URL: https://<name>.vercel.app**.
 
 ## 9. Final check on the live site
 
-- The **"Enter the passcode"** page comes first; a wrong passcode is refused, the right one opens the site.
+- The **"Enter the passcode"** page comes first; a wrong passcode is refused, the right one opens the site for 6 hours.
 - Upload a short video with sound; it reaches **Preview ready**.
 - Export at 720p and download it; it plays at full length **with sound**.
 - `/pricing` sends you to the home page; on a phone, nothing scrolls sideways.
@@ -217,6 +217,7 @@ After about 2 minutes it prints **Production URL: https://<name>.vercel.app**.
 | Symptom | Cause | Fix |
 | --- | --- | --- |
 | Cards stuck on **Waiting**; `/api/worker/claim` returns 404 | the worker routes weren't uploaded | `.vercelignore` must use `/worker`, not `worker`; redeploy |
+| The **passcode page** comes back | by design every **6 hours** (it says "It's been more than 6 hours"); otherwise the browser blocks cookies, or `SITE_PASSCODE` was changed | Enter the passcode again. Allow cookies for the site. To change the 6 hours, edit `GATE_HOURS` in `lib/gate.ts` and redeploy. |
 | In **Safari**, the first clean works but later cards stay **"Waiting"** | an old version waited forever for Safari's audio permission (BUG-013, fixed 2026-11-09) | Make sure the latest code is deployed, then **reload the page**. A tab that's stuck keeps running the old code until you reload. To test Safari's engine locally: `npx playwright test --project=safari`. |
 | In **Safari**, the **"Cleaned"** side of the before/after view is **black** (or a downloaded `.webm` won't open) | an old version wrote the video length in a way Safari can't read (BUG-014, fixed 2026-11-09) | Deploy the latest code and **reload the page**, then clean the video again. Previews made before the fix stay unplayable in Safari but still play in Chrome; they're deleted after the 3-day retention anyway. |
 | Upload fails (CORS error in the console) | the site's address isn't in the R2 CORS policy | add the exact `https://…` origin (step 4.4) |
@@ -239,4 +240,4 @@ After about 2 minutes it prints **Production URL: https://<name>.vercel.app**.
 | DNS | BigRock: CNAME `cleanup` → `9c69b23c5db9d688.vercel-dns-017.com` |
 | HTTPS | Let's Encrypt via Vercel, renews automatically |
 | Retention | 3 days (`retentionDays` in `lib/plans.ts`, applies to existing videos too); cleanup job daily at 03:00 UTC |
-| Access | passcode gate (`SITE_PASSCODE`, Secret on Vercel); no logins. Change or delete it in Vercel settings, then redeploy |
+| Access | passcode gate (`SITE_PASSCODE`, Secret on Vercel), entry lasts 6 hours (`GATE_HOURS` in `lib/gate.ts`); no logins. Change or delete it in Vercel settings, then redeploy |

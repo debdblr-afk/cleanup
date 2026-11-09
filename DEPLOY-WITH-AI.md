@@ -24,7 +24,7 @@ You are guiding a non-expert through deploying a web app. Follow these rules exa
 **The app:** "Cleanup" removes the user's own logos, captions and stray text from their videos. Next.js 15 (App Router, TypeScript) web app in the folder `cleanup/`. The code is also in the person's private GitHub repo (`debdblr-afk/cleanup`), but deploying doesn't need GitHub: the Vercel CLI uploads from the folder.
 
 **How it works:**
-- **The whole site is behind a passcode** (`SITE_PASSCODE`). Visitors see an "Enter the passcode" page first; the right passcode sets a signed cookie for 30 days. Cron and worker routes stay open (they have their own secrets).
+- **The whole site is behind a passcode** (`SITE_PASSCODE`). Visitors see an "Enter the passcode" page first; the right passcode sets a signed, dated cookie that works for 6 hours (`GATE_HOURS` in `lib/gate.ts`); after that the site asks for the passcode again, and a tab left open is sent back to the passcode page on its next action. Cron and worker routes stay open (they have their own secrets).
 - **There are no logins.** Visitors are anonymous **guests** (Supabase anonymous sign-in, done automatically); their videos belong to that browser.
 - Videos upload **straight from the browser to Cloudflare R2** using short-lived signed URLs. The bucket is private.
 - Cleaning and exporting happen **in the visitor's browser tab** (canvas + MediaRecorder). Exports keep the **original sound** (WebM with Opus audio). A 30-minute export takes ~30 minutes with the tab open.
@@ -285,7 +285,7 @@ union all select 'migrations recorded', (select count(*)::text from supabase_mig
 ### Step 9 — Final live check (5 min)
 
 On `https://<your-domain>`:
-0. The **"Enter the passcode"** page appears first; a wrong passcode says "That passcode isn't right."; the right one opens the site.
+0. The **"Enter the passcode"** page appears first; a wrong passcode says "That passcode isn't right."; the right one opens the site (for 6 hours).
 1. Tick the rights box, upload a short video **with sound** → **Preview ready**.
 2. Card → **Export** → dialog says **"Unlimited exports."** → **Export 720p** (keep the tab open) → **Download**. **Check:** the file plays at full length **with sound**.
 3. Batch page shows **"kept until"** a date **3 days** after upload.
@@ -318,7 +318,7 @@ On `https://<your-domain>`:
 | `dig @8.8.8.8` shows nothing after an hour | CNAME not saved, or saved on wrong domain/host | Re-check Step 8.2 (host = just the subdomain, value without `https://`). |
 | R2 says token/permission denied on upload | token not scoped to `cleanup-media` or wrong keys pasted | Create a new R2 token (Step 4.5), update both S3 keys in Vercel, redeploy. |
 | Changes to settings don't appear on the site | `NEXT_PUBLIC_` values are baked in at build | Redeploy: `npx vercel deploy --prod --yes`. |
-| Passcode page keeps coming back after entering | browser blocks cookies, or the passcode setting was changed | Allow cookies for the site; after changing `SITE_PASSCODE`, everyone enters the new one once. |
+| Passcode page keeps coming back after entering | browser blocks cookies, or the passcode setting was changed. (Once every 6 hours is by design: "It's been more than 6 hours".) | Allow cookies for the site; after changing `SITE_PASSCODE`, everyone enters the new one once. To change the 6 hours, edit `GATE_HOURS` in `lib/gate.ts` and redeploy. |
 | Want to change or remove the passcode | — | Vercel → Settings → Environment Variables → edit or delete `SITE_PASSCODE` → redeploy. Deleting it opens the site to everyone. |
 | Old wording/page after deploy for a few seconds | new version still switching in | Wait ~30 s and reload. |
 
@@ -353,4 +353,4 @@ On `https://<your-domain>`:
 | DNS | BigRock: CNAME `cleanup` → `9c69b23c5db9d688.vercel-dns-017.com` |
 | HTTPS | Let's Encrypt via Vercel, auto-renews |
 | Retention | 3 days (by upload time); cleanup job daily 03:00 UTC (`vercel.json`) |
-| Access | passcode gate (`SITE_PASSCODE`, Secret on Vercel); no logins |
+| Access | passcode gate (`SITE_PASSCODE`, Secret on Vercel), entry lasts 6 hours (`GATE_HOURS`); no logins |

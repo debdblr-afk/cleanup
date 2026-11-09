@@ -3,6 +3,7 @@ import { Lock } from "lucide-react";
 import { useSearchParams } from "next/navigation";
 import { Suspense, useId, useState } from "react";
 import { Button } from "@/components/ui/primitives";
+import { GATE_HOURS } from "@/lib/gate";
 
 /** Only same-site paths, so the redirect after entering can't send anyone elsewhere. */
 function safeNext(v: string | null): string {
@@ -38,7 +39,9 @@ function EnterForm() {
     <div className="mx-auto max-w-sm px-4 py-20">
       <div className="mx-auto mb-5 size-12 rounded-xl bg-surface border border-border grid place-items-center text-accent" aria-hidden><Lock className="size-6" /></div>
       <h1 className="text-xl text-center">Enter the passcode</h1>
-      <p className="text-sm text-text-muted text-center mt-2">Cleanup is private for now.</p>
+      <p className="text-sm text-text-muted text-center mt-2">
+        {params.get("expired") ? `It's been more than ${GATE_HOURS} hours, so enter the passcode again.` : "Cleanup is private for now."}
+      </p>
       <form onSubmit={submit} noValidate className="mt-6 space-y-3">
         <div>
           <label htmlFor={inputId} className="text-sm font-medium">Passcode</label>

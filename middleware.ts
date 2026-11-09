@@ -1,21 +1,25 @@
 import { createServerClient } from "@supabase/ssr";
 import { NextResponse, type NextRequest } from "next/server";
-import { GATE_COOKIE, gateOpen, gatePasscode, gateToken, sameString } from "@/lib/gate";
+import { checkGate, GATE_COOKIE, gateOpen, gatePasscode } from "@/lib/gate";
 import { SUPABASE_ANON_KEY, SUPABASE_URL } from "@/lib/supabase/env";
 
 // Refreshes the Supabase session cookie on page and API requests so handlers see a valid user.
 export async function middleware(request: NextRequest) {
   const p = request.nextUrl.pathname;
 
-  // Passcode gate: with SITE_PASSCODE set, nothing but the entry page opens without the cookie.
+  // Passcode gate: with SITE_PASSCODE set, nothing but the entry page opens without a cookie
+  // from the last GATE_HOURS hours.
   const passcode = gatePasscode();
   if (passcode && !gateOpen(p)) {
-    const got = request.cookies.get(GATE_COOKIE)?.value ?? "";
-    if (!sameString(got, await gateToken(passcode))) {
+    const state = await checkGate(passcode, request.cookies.get(GATE_COOKIE)?.value ?? "");
+    if (state !== "ok") {
       if (p.startsWith("/api/")) return NextResponse.json({ error: { code: "passcode", message: "Enter the passcode first." } }, { status: 401 });
       const to = request.nextUrl.clone();
       to.pathname = "/enter";
-      to.search = p === "/" ? "" : `?next=${encodeURIComponent(p + request.nextUrl.search)}`;
+      const q = new URLSearchParams();
+      if (p !== "/") q.set("next", p + request.nextUrl.search);
+      if (state === "expired") q.set("expired", "1");
+      to.search = q.size ? `?${q}` : "";
       return NextResponse.redirect(to);
     }
   }

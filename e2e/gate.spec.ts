@@ -1,3 +1,4 @@
+import { gateToken, GATE_HOURS } from "../lib/gate";
 import { expect, test } from "./helpers";
 
 // Runs only when the passcode gate is on (SITE_PASSCODE set for the dev server and the tests).
@@ -43,5 +44,34 @@ test.describe("Passcode gate", () => {
     await context.addCookies([{ name: "cleanup_gate", value: "forged-value", url: "http://localhost:5320" }]);
     await page.goto("/");
     await expect(page).toHaveURL(/\/enter$/);
+  });
+
+  test("GATE-5 an entry older than 6 hours asks for the passcode again", async ({ page, context }) => {
+    const sevenHoursAgo = Math.floor(Date.now() / 1000) - (GATE_HOURS + 1) * 3600;
+    await context.addCookies([{ name: "cleanup_gate", value: await gateToken(CODE!, sevenHoursAgo), url: "http://localhost:5320" }]);
+    await page.goto("/account");
+    await expect(page).toHaveURL(/\/enter\?next=%2Faccount&expired=1$/);
+    await expect(page.getByText(`It's been more than ${GATE_HOURS} hours, so enter the passcode again.`)).toBeVisible();
+    await page.getByLabel("Passcode").fill(CODE!);
+    await page.getByRole("button", { name: "Enter" }).click();
+    await expect(page).toHaveURL(/\/account$/);
+    // The new entry is dated now, so it lasts another 6 hours.
+    const cookie = (await context.cookies()).find((c) => c.name === "cleanup_gate")!;
+    expect(Number(cookie.value.split(".")[0])).toBeGreaterThan(Math.floor(Date.now() / 1000) - 60);
+    expect(cookie.expires - Date.now() / 1000).toBeGreaterThan(GATE_HOURS * 3600 - 120);
+    expect(cookie.expires - Date.now() / 1000).toBeLessThanOrEqual(GATE_HOURS * 3600 + 5);
+  });
+
+  test("GATE-6 a tab left open past 6 hours goes back to the passcode page on its next action", async ({ page, context }) => {
+    await page.request.post("/api/enter", { data: { passcode: CODE } });
+    await page.goto("/");
+    await expect(page.getByRole("button", { name: /Try a sample/ })).toBeVisible();
+    // Time passes: the browser still holds a genuine cookie, but it's 7 hours old now.
+    const sevenHoursAgo = Math.floor(Date.now() / 1000) - (GATE_HOURS + 1) * 3600;
+    await context.clearCookies({ name: "cleanup_gate" }); // WebKit would keep both otherwise
+    await context.addCookies([{ name: "cleanup_gate", value: await gateToken(CODE!, sevenHoursAgo), url: "http://localhost:5320" }]);
+    await page.getByRole("button", { name: /Try a sample/ }).click();
+    await expect(page).toHaveURL(/\/enter\?expired=1$/);
+    await expect(page.getByText(`It's been more than ${GATE_HOURS} hours`)).toBeVisible();
   });
 });
