@@ -7,6 +7,7 @@
 
 import { detectStatic } from "../engine/detect";
 import { render, RenderError } from "../engine/render";
+import { unlockAudioOnInteraction } from "../engine/audio";
 import { pickRecorderType, probe, sampleFrames } from "../engine/video";
 import { hoursUntilUtcMidnight, uid, utcDate } from "../format";
 import { mergeMasks } from "../mask";
@@ -529,6 +530,9 @@ function kickWorker() {
   })();
 }
 
+// Safari only allows audio inside a click: start it on the visitor's first interaction (BUG-013).
+if (typeof window !== "undefined") unlockAudioOnInteraction();
+
 // Fallback poll: picks up queued work if a Realtime event was missed, and work a refreshed or
 // closed tab left half done (the server hands it over once it has been quiet for 30 s).
 if (typeof window !== "undefined") {
@@ -569,10 +573,47 @@ function heartbeat(kind: "jobs" | "exports", id: string, abort: AbortController,
   return () => clearInterval(t);
 }
 
-async function runJob(job: Job) {
+/**
+ * Runs one piece of work with a time limit (BUG-013). If it runs far past its expected time, or
+ * keeps going 5 s after being canceled, it is abandoned: the server is told it failed (the
+ * preview or export is given back) and the tab moves on, so one stuck step can't stop every
+ * later job. Whatever the abandoned work does afterwards is refused by the server (not held).
+ */
+async function guarded(kind: "jobs" | "exports", id: string, limitMs: number, progress: () => number, work: (abort: AbortController) => Promise<void>) {
   const abort = new AbortController();
-  running = { id: job.id, abort };
-  const stopBeat = heartbeat("jobs", job.id, abort, () => state.jobs.get(job.id)?.progress ?? 0);
+  running = { id, abort };
+  const stopBeat = heartbeat(kind, id, abort, progress);
+  let timedOut = false;
+  let timer: ReturnType<typeof setTimeout> | undefined;
+  const expired = new Promise<void>((resolve) => { timer = setTimeout(() => { timedOut = true; abort.abort(); resolve(); }, limitMs); });
+  const windDown = new Promise<void>((resolve) => abort.signal.addEventListener("abort", () => setTimeout(resolve, 5000), { once: true }));
+  try {
+    await Promise.race([work(abort), expired, windDown]);
+  } catch {
+    /* work reports its own failures */
+  } finally {
+    clearTimeout(timer);
+    stopBeat();
+    if (timedOut) await api(`/api/worker/${kind}/${id}/complete`, { body: { workerId, ok: false, ...(kind === "jobs" ? { errorCode: "render_failed" } : {}) } }).catch(() => {});
+    if (running?.id === id) running = null;
+  }
+}
+
+const MINUTE = 60_000;
+
+function runJob(job: Job) {
+  // A preview: detection over the whole video plus 5 s of rendering and an upload.
+  return guarded("jobs", job.id, 4 * MINUTE, () => state.jobs.get(job.id)?.progress ?? 0, (abort) => runJobWork(job, abort));
+}
+
+function runExport(ex: Export) {
+  // A full export renders in real time, then uploads: allow 1.5x the video's length plus 5 minutes.
+  const job = state.jobs.get(ex.jobId);
+  const ms = (job && state.videos.get(job.videoId)?.durationMs) || 30 * MINUTE;
+  return guarded("exports", ex.id, ms * 1.5 + 5 * MINUTE, () => state.exports.get(ex.id)?.progress ?? 0, (abort) => runExportWork(ex, abort));
+}
+
+async function runJobWork(job: Job, abort: AbortController) {
   state.jobs.set(job.id, job);
   emit();
   let detected: Mask | null = null;
@@ -609,16 +650,10 @@ async function runJob(job: Job) {
     if (abort.signal.aborted) return;
     const code = e instanceof RenderError && e.code === "unsupported_browser" ? "unsupported_browser" : "render_failed";
     await api(`/api/worker/jobs/${job.id}/complete`, { body: { workerId, ok: false, errorCode: code, ...(detected ? { detectedMask: detected } : {}) } }).catch(() => {});
-  } finally {
-    stopBeat();
-    running = null;
   }
 }
 
-async function runExport(ex: Export) {
-  const abort = new AbortController();
-  running = { id: ex.id, abort };
-  const stopBeat = heartbeat("exports", ex.id, abort, () => state.exports.get(ex.id)?.progress ?? 0);
+async function runExportWork(ex: Export, abort: AbortController) {
   try {
     let job = state.jobs.get(ex.jobId);
     if (!job) {
@@ -643,8 +678,5 @@ async function runExport(ex: Export) {
     await api(`/api/worker/exports/${ex.id}/complete`, { body: { workerId, ok: true, durationMs: out.durationMs } });
   } catch {
     if (!abort.signal.aborted) await api(`/api/worker/exports/${ex.id}/complete`, { body: { workerId, ok: false } }).catch(() => {});
-  } finally {
-    stopBeat();
-    running = null;
   }
 }

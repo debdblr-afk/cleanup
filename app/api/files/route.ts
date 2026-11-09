@@ -26,6 +26,12 @@ export async function GET(req: Request) {
     if (data && data.user_id === user.id) path = data.result_key;
   }
   if (!path) return fail(404, "not_found", "No such file.");
-  const signed = await signedRead(path, 600, download);
+  let signed: string;
+  try {
+    signed = await signedRead(path, 600, download);
+  } catch {
+    // The file is gone (removed or expired) though its record remains: "not found", not a crash.
+    return fail(404, "not_found", "No such file.");
+  }
   return NextResponse.redirect(signed, { status: 302, headers: { "cache-control": "private, no-store" } });
 }

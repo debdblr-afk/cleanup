@@ -259,6 +259,8 @@ try {
   const left = await listFiles(`u/${A.id}/${video.id}`);
   const vrow = (await admin.from("videos").select("status").eq("id", video.id).single()).data;
   check("expire deletes files and marks the video", ex.status === 200 && ex.json.videos >= 1 && left.length === 0 && vrow.status === "deleted", JSON.stringify(ex.json));
+  const gonePreview = await call(A, "GET", `/api/files?kind=preview&id=${job1.id}`);
+  check("a deleted video's preview answers 404, not a crash", gonePreview.status === 404, String(gonePreview.status));
   const oldLeft = await listFiles(`u/${A.id}/${ov.video.id}`);
   const oldRow = (await admin.from("videos").select("status").eq("id", ov.video.id).maybeSingle()).data;
   check("a video older than the retention period is deleted, whatever its stored expiry", oldLeft.length === 0 && (!oldRow || oldRow.status === "deleted"), JSON.stringify({ oldRow, files: oldLeft.length }));

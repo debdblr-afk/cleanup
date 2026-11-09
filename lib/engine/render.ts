@@ -7,6 +7,7 @@
 import fixWebmDuration from "fix-webm-duration";
 import { activeAt, rasterizeBrush, toPixels } from "../mask";
 import type { Mask } from "../types";
+import { runningAudioContext } from "./audio";
 import { fillMask, fillRect } from "./inpaint";
 import { disposeVideo, loadVideo, pickRecorderType } from "./video";
 
@@ -32,22 +33,23 @@ function typeWithAudio(videoType: string): string {
 }
 
 /**
- * The video's sound as a track for the recorder. Sound goes to the recording only, never the
- * speakers. Returns null when the browser won't allow it; the export then has no sound.
+ * The video's sound as a track for the recorder, through the shared AudioContext. Sound goes to
+ * the recording only, never the speakers. Null (record without sound) when the browser won't run
+ * audio right now; this never waits more than a moment (see audio.ts, BUG-013).
  */
 async function audioTrackFor(v: HTMLVideoElement): Promise<{ track: MediaStreamTrack; close: () => void } | null> {
-  if (typeof AudioContext === "undefined") return null;
+  const ctx = await runningAudioContext();
+  if (!ctx) return null;
   try {
-    const ctx = new AudioContext();
     const dest = ctx.createMediaStreamDestination();
-    ctx.createMediaElementSource(v).connect(dest);
-    // Exports start from a click, which lets the page start audio.
-    if (ctx.state !== "running") await ctx.resume().catch(() => {});
+    const src = ctx.createMediaElementSource(v);
+    src.connect(dest);
     v.muted = false;
     v.volume = 1;
     const track = dest.stream.getAudioTracks()[0];
-    if (!track) { void ctx.close(); return null; }
-    return { track, close: () => void ctx.close() };
+    const close = () => { try { src.disconnect(); dest.disconnect(); } catch { /* already gone */ } };
+    if (!track) { close(); return null; }
+    return { track, close };
   } catch {
     return null;
   }
@@ -130,11 +132,25 @@ export async function render(source: Blob, mask: Mask, opts: RenderOptions): Pro
     const stream = canvas.captureStream(30);
     audio = await audioTrackFor(v);
     if (audio) stream.addTrack(audio.track);
-    const recordType = audio ? typeWithAudio(type) : type;
-    const recorder = new MediaRecorder(stream, { mimeType: recordType, videoBitsPerSecond: height >= 1080 ? 8_000_000 : 4_000_000, audioBitsPerSecond: 160_000 });
+    let recordType = audio ? typeWithAudio(type) : type;
+    const bits = { videoBitsPerSecond: height >= 1080 ? 8_000_000 : 4_000_000, audioBitsPerSecond: 160_000 };
+    let recorder: MediaRecorder;
+    try {
+      recorder = new MediaRecorder(stream, { mimeType: recordType, ...bits });
+    } catch {
+      // This browser can't record that combination: record the picture alone rather than fail.
+      if (audio) { stream.removeTrack(audio.track); audio.close(); audio = null; }
+      recordType = type;
+      recorder = new MediaRecorder(stream, { mimeType: recordType, ...bits });
+    }
     const chunks: Blob[] = [];
     recorder.ondataavailable = (e) => { if (e.data.size) chunks.push(e.data); };
-    const stopped = new Promise<void>((resolve) => { recorder.onstop = () => resolve(); });
+    // Ends when the recorder stops, or errors. Some browsers stop a recorder on their own after an
+    // error and never fire "stop" again, so finish() also ends it when the recorder is already inactive.
+    let endRecording!: () => void;
+    let recordError: unknown = null;
+    const stopped = new Promise<void>((resolve) => { endRecording = resolve; recorder.onstop = () => resolve(); });
+    recorder.onerror = (e) => { recordError = (e as unknown as { error?: unknown }).error ?? e; finish(); };
 
     let finished = false;
     const finish = () => {
@@ -142,6 +158,9 @@ export async function render(source: Blob, mask: Mask, opts: RenderOptions): Pro
       finished = true;
       v.pause();
       if (recorder.state !== "inactive") recorder.stop();
+      else endRecording();
+      // Belt and braces: never wait more than 3 s for "stop" once finished.
+      setTimeout(endRecording, 3000);
     };
 
     const onAbort = () => finish();
@@ -169,6 +188,7 @@ export async function render(source: Blob, mask: Mask, opts: RenderOptions): Pro
     clearTimeout(guard);
     opts.signal?.removeEventListener("abort", onAbort);
     if (opts.signal?.aborted) throw new RenderError("canceled", "Canceled");
+    if (recordError && !chunks.length) throw new RenderError("render_failed", "The browser stopped recording.");
     let blob = new Blob(chunks, { type: recordType.split(";")[0] });
     if (!blob.size) throw new RenderError("render_failed", "The recording came out empty.");
     // MediaRecorder leaves the length out of WebM files; write it in so players can show it and seek.

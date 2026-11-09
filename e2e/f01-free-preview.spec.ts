@@ -90,7 +90,9 @@ test.describe("F01 guest cleans a video and grabs the free preview", () => {
     await expect(page.getByText(/0 of 30 videos/)).toBeVisible();
   });
 
-  test("F01-E2b refresh while it's cleaning: the card still finishes (BUG-003)", async ({ page }) => {
+  test("F01-E2b refresh while it's cleaning: the card still finishes (BUG-003)", async ({ page }, info) => {
+    // Reloading mid-request makes Safari report the cancelled requests this way.
+    info.annotations.push({ type: "allow-console", description: "due to access control checks|Load failed|cancelled" });
     await startWithSample(page);
     await expect(card(page, /sample/i).getByText(/Finding the watermark|Cleaning the 5 s preview/).first()).toBeVisible({ timeout: 60_000 });
     await page.reload();
@@ -150,7 +152,8 @@ test.describe("F01 guest cleans a video and grabs the free preview", () => {
     await axe(page);
   });
 
-  test("F01-E6 keyboard only: tick the box and start the sample", async ({ page }) => {
+  test("F01-E6 keyboard only: tick the box and start the sample", async ({ page, browserName }) => {
+    test.skip(browserName === "webkit", "Safari only tabs to form controls when 'Press Tab to highlight each item' is on");
     await page.goto("/");
     const box = attestBox(page);
     for (let i = 0; i < 25 && !(await box.evaluate((el) => el === document.activeElement)); i++) await page.keyboard.press("Tab");

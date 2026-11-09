@@ -217,6 +217,7 @@ After about 2 minutes it prints **Production URL: https://<name>.vercel.app**.
 | Symptom | Cause | Fix |
 | --- | --- | --- |
 | Cards stuck on **Waiting**; `/api/worker/claim` returns 404 | the worker routes weren't uploaded | `.vercelignore` must use `/worker`, not `worker`; redeploy |
+| In **Safari**, the first clean works but later cards stay **"Waiting"** | an old version waited forever for Safari's audio permission (BUG-013, fixed 2026-11-09) | Make sure the latest code is deployed, then **reload the page**. A tab that's stuck keeps running the old code until you reload. To test Safari's engine locally: `npx playwright test --project=safari`. |
 | Upload fails (CORS error in the console) | the site's address isn't in the R2 CORS policy | add the exact `https://…` origin (step 4.4) |
 | The sign-in email link opens localhost | Supabase Site URL or redirect not set | step 3.2 |
 | Vercel: "Remove the public framework prefix…" | a `NEXT_PUBLIC_` variable set as Secret | add it as **Config** |

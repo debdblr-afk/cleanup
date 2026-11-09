@@ -23,15 +23,18 @@ export const test = base.extend<{ guard: void }>({
     const problems: string[] = [];
     // A test can allow a known 5xx with test.info().annotations.push({ type: "allow-5xx", description: "/api/..." }).
     const allowed = (url: string) => info.annotations.some((a) => a.type === "allow-5xx" && a.description && url.includes(a.description));
+    // A test can allow a known console/page message with { type: "allow-console", description: "<regex>" }.
+    const allowedText = (text: string) => info.annotations.some((a) => a.type === "allow-console" && a.description && new RegExp(a.description).test(text));
     page.on("console", (m) => {
       if (m.type() !== "error") return;
       const text = m.text();
       if (/Failed to load resource: the server responded with a status of 4\d\d/.test(text)) return;
       if (/net::ERR_INTERNET_DISCONNECTED/.test(text)) return; // the offline case, asserted by its test
       if (/Failed to load resource/.test(text) && allowed(m.location().url)) return;
+      if (allowedText(text)) return;
       problems.push(`console: ${text}`);
     });
-    page.on("pageerror", (e) => problems.push(`pageerror: ${e.message}`));
+    page.on("pageerror", (e) => { if (!allowedText(e.message)) problems.push(`pageerror: ${e.message}`); });
     page.on("response", (r) => { if (r.status() >= 500 && !allowed(r.url())) problems.push(`${r.status()} ${r.request().method()} ${r.url()}`); });
     await use();
     expect(problems, "console errors or 5xx responses").toEqual([]);

@@ -13,6 +13,8 @@ export async function loadVideo(url: string): Promise<HTMLVideoElement> {
   await new Promise<void>((resolve, reject) => {
     v.onloadedmetadata = () => resolve();
     v.onerror = () => reject(new Error("unsupported"));
+    // Some browsers never fire either event for a file they can't read: don't wait forever.
+    setTimeout(() => reject(new Error("unsupported")), 30_000);
   });
   await fixDuration(v);
   return v;
