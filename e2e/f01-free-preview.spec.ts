@@ -29,39 +29,35 @@ test.describe("F01 guest cleans a video and grabs the free preview", () => {
 
   test("F01-H2 upload your own file with the rights box ticked", async ({ page }) => {
     await page.goto("/");
-    await attestBox(page).check();
     await uploadFiles(page, ["clip-a.webm"]);
     await page.waitForURL(/\/b\//);
     await waitPreviewReady(page, "clip-a.webm");
     await expect(card(page, "clip-a.webm")).toContainText("360p");
   });
 
-  test("F01-N1 rights box unticked: nothing uploads, the box is flagged", async ({ page }) => {
+  test("F01-N1 no rights box while the site is in testing: a video uploads straight away", async ({ page }) => {
     await page.goto("/");
+    await expect(attestBox(page)).toHaveCount(0);
+    await expect(page.getByText(/I own these videos/)).toHaveCount(0);
     await uploadFiles(page, ["clip-a.webm"]);
-    await expect(page.getByRole("alert").filter({ hasText: "Tick the box first" })).toBeVisible();
-    await expect(attestBox(page)).toBeFocused();
-    await expect(attestBox(page)).toHaveAttribute("aria-invalid", "true");
-    expect(page.url()).not.toMatch(/\/b\//);
+    await page.waitForURL(/\/b\//);
+    await expect(card(page, "clip-a.webm")).toBeVisible();
   });
 
   test("F01-N2 a text file is refused with a clear message", async ({ page }) => {
     await page.goto("/");
-    await attestBox(page).check();
     await uploadFiles(page, ["notes.txt"]);
     await expect(page.getByRole("alert").filter({ hasText: "isn't a video we can open" })).toBeVisible();
   });
 
   test("F01-N3 a damaged video is refused with a clear message", async ({ page }) => {
     await page.goto("/");
-    await attestBox(page).check();
     await uploadFiles(page, ["broken.mp4"]);
     await expect(page.getByRole("alert").filter({ hasText: "couldn't be opened" })).toBeVisible();
   });
 
   test("F01-H3 a video over a minute is accepted: everyone gets up to 30 minutes", async ({ page }) => {
     await page.goto("/");
-    await attestBox(page).check();
     await uploadFiles(page, ["long-62s.webm"]);
     await page.waitForURL(/\/b\//);
     await expect(card(page, "long-62s.webm")).toContainText("1:02");
@@ -110,7 +106,6 @@ test.describe("F01 guest cleans a video and grabs the free preview", () => {
 
   test("F01-E3 cancel while cleaning, then try again", async ({ page }) => {
     await page.goto("/");
-    await attestBox(page).check();
     await uploadFiles(page, ["clip-b.webm"]);
     await page.waitForURL(/\/b\//);
     const c = card(page, "clip-b.webm");
@@ -132,7 +127,6 @@ test.describe("F01 guest cleans a video and grabs the free preview", () => {
 
   test("F01-E3c Try again refused by the server: a message, the real state, no crash (BUG-011)", async ({ page }) => {
     await page.goto("/");
-    await attestBox(page).check();
     await uploadFiles(page, ["clip-b.webm"]);
     await page.waitForURL(/\/b\//);
     const c = card(page, "clip-b.webm");
@@ -151,7 +145,6 @@ test.describe("F01 guest cleans a video and grabs the free preview", () => {
     await page.setViewportSize({ width: 390, height: 844 });
     await page.goto("/");
     await noHorizontalScroll(page);
-    await attestBox(page).check();
     await page.locator('input[type="file"]').first().setInputFiles(target);
     await page.waitForURL(/\/b\//);
     await expect(card(page, long)).toBeVisible();
@@ -161,16 +154,11 @@ test.describe("F01 guest cleans a video and grabs the free preview", () => {
     await axe(page);
   });
 
-  test("F01-E6 keyboard only: tick the box and start the sample", async ({ page, browserName }) => {
+  test("F01-E6 keyboard only: start the sample", async ({ page, browserName }) => {
     test.skip(browserName === "webkit", "Safari only tabs to form controls when 'Press Tab to highlight each item' is on");
     await page.goto("/");
-    const box = attestBox(page);
-    for (let i = 0; i < 25 && !(await box.evaluate((el) => el === document.activeElement)); i++) await page.keyboard.press("Tab");
-    await expect(box).toBeFocused();
-    await page.keyboard.press("Space");
-    await expect(box).toBeChecked();
     const sample = page.getByRole("button", { name: /Try a sample/ });
-    for (let i = 0; i < 25 && !(await sample.evaluate((el) => el === document.activeElement)); i++) await page.keyboard.press("Shift+Tab");
+    for (let i = 0; i < 25 && !(await sample.evaluate((el) => el === document.activeElement)); i++) await page.keyboard.press("Tab");
     await expect(sample).toBeFocused();
     await page.keyboard.press("Enter");
     await page.waitForURL(/\/b\//, { timeout: 60_000 });

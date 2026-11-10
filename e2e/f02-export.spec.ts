@@ -2,7 +2,7 @@ import { spawnSync } from "node:child_process";
 import { statSync } from "node:fs";
 import ffmpeg from "ffmpeg-static";
 import { parseProbe } from "../worker/plan.mjs";
-import { attestBox, axe, card, expect, startWithSample, test, uploadFiles, waitPreviewReady } from "./helpers";
+import { axe, card, expect, startWithSample, test, uploadFiles, waitPreviewReady } from "./helpers";
 
 const SERVER = process.env.NEXT_PUBLIC_EXPORT_WORKER === "server";
 const EXT = SERVER ? "mp4" : "webm";
@@ -48,7 +48,6 @@ test.describe("F02 export the full video", () => {
   test("F02-H3 server export keeps the sound and the page can be closed", async ({ page, context }) => {
     test.skip(!SERVER, "only with the server worker (NEXT_PUBLIC_EXPORT_WORKER=server)");
     await page.goto("/");
-    await attestBox(page).check();
     await uploadFiles(page, ["clip-sound.webm"]);
     await page.waitForURL(/\/b\//);
     const batch = page.url();
@@ -75,7 +74,6 @@ test.describe("F02 export the full video", () => {
 
   test("F02-H4 the export keeps the original sound (tab or server)", async ({ page }) => {
     await page.goto("/");
-    await attestBox(page).check();
     await uploadFiles(page, ["clip-sound.webm"]);
     await page.waitForURL(/\/b\//);
     await waitPreviewReady(page, "clip-sound.webm");

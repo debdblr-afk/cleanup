@@ -28,7 +28,7 @@ export const createVideo = z.object({
   contentType: z.string().refine((t) => ACCEPTED_TYPES.includes(t), "Unsupported video type"),
   sizeBytes: z.number().int().positive(),
   source: z.enum(["upload", "sample"]).default("upload"),
-  attest: z.literal(true),
+  attest: z.literal(true).optional(), // required by the route while ASK_RIGHTS is on
   attestationVersion: z.string().min(1).max(32),
 });
 

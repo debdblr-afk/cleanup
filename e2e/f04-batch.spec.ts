@@ -1,9 +1,8 @@
-import { attestBox, axe, card, expect, test, uploadFiles, waitPreviewReady } from "./helpers";
+import { axe, card, expect, test, uploadFiles, waitPreviewReady } from "./helpers";
 
 test.describe("F04 clean several videos in one batch", () => {
   test("F04-H1 two files at once, two cards, both finish; add a third from the tile", async ({ page }) => {
     await page.goto("/");
-    await attestBox(page).check();
     await uploadFiles(page, ["clip-a.webm", "clip-b.webm"]);
     await page.waitForURL(/\/b\//);
     await expect(page.getByRole("article")).toHaveCount(2);
@@ -19,7 +18,6 @@ test.describe("F04 clean several videos in one batch", () => {
 
   test("F04-E1 one bad file among good ones: the good one is added, the bad one is reported", async ({ page }) => {
     await page.goto("/");
-    await attestBox(page).check();
     await uploadFiles(page, ["clip-a.webm", "broken.mp4"]);
     await page.waitForURL(/\/b\//);
     await expect(page.getByRole("article")).toHaveCount(1);
@@ -28,7 +26,6 @@ test.describe("F04 clean several videos in one batch", () => {
 
   test("F04-E2 remove a video from the batch", async ({ page }) => {
     await page.goto("/");
-    await attestBox(page).check();
     await uploadFiles(page, ["clip-a.webm", "clip-b.webm"]);
     await page.waitForURL(/\/b\//);
     await waitPreviewReady(page, "clip-a.webm");
@@ -42,7 +39,6 @@ test.describe("F04 clean several videos in one batch", () => {
 
   test("F04-E3 the same batch open in two tabs stays in sync", async ({ page, context }) => {
     await page.goto("/");
-    await attestBox(page).check();
     await uploadFiles(page, ["clip-a.webm"]);
     await page.waitForURL(/\/b\//);
     const second = await context.newPage();

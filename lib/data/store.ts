@@ -11,7 +11,7 @@ import { unlockAudioOnInteraction } from "../engine/audio";
 import { pickRecorderType, probe, sampleFrames } from "../engine/video";
 import { hoursUntilUtcMidnight, uid, utcDate } from "../format";
 import { mergeMasks } from "../mask";
-import { ACCEPTED_TYPES, ATTESTATION_VERSION, BATCH_LIMIT, PLANS, PREVIEW_MS, RESOLUTIONS, type Plan } from "../plans";
+import { ACCEPTED_TYPES, ASK_RIGHTS, ATTESTATION_VERSION, BATCH_LIMIT, RIGHTS_NOT_ASKED, PLANS, PREVIEW_MS, RESOLUTIONS, type Plan } from "../plans";
 import { fileUrl as apiFileUrl, planIdFor, toBatch, toExport, toJob, toProfile, toVideo } from "../rows";
 import type { Batch, Export, Job, Mask, Profile, RejectReason, Region, RemovalMode, Video } from "../types";
 import { supabaseBrowser } from "../supabase/client";
@@ -232,6 +232,7 @@ export function quotaStatus() {
 
 const ATTEST_KEY = "cleanup.attested";
 export function hasAttested(): boolean {
+  if (!ASK_RIGHTS) return true; // not asked while the site is in testing
   try { return localStorage.getItem(ATTEST_KEY) === ATTESTATION_VERSION; } catch { return false; }
 }
 export function setAttested(on: boolean) {
@@ -284,7 +285,7 @@ export async function addVideos(batchId: string, files: File[], source: "upload"
     if (meta.durationMs > plan.maxDurationMs) { rejected.push({ filename: file.name, reason: "too_long", durationMs: meta.durationMs }); continue; }
     try {
       const res = await api<{ video: Video; upload: Upload }>("/api/videos", {
-        body: { batchId, filename: file.name || "video", contentType: type, sizeBytes: file.size, source, attest: true, attestationVersion: ATTESTATION_VERSION },
+        body: { batchId, filename: file.name || "video", contentType: type, sizeBytes: file.size, source, ...(ASK_RIGHTS ? { attest: true, attestationVersion: ATTESTATION_VERSION } : { attestationVersion: RIGHTS_NOT_ASKED }) },
       });
       const video = res.video;
       putVideo(video);

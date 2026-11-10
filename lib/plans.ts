@@ -62,4 +62,11 @@ export function resolutionAllowed(plan: Plan, res: Export["resolution"]): boolea
 export const PREVIEW_MS = 5_000;
 export const BATCH_LIMIT = 30;
 export const ATTESTATION_VERSION = "2026-11-07";
+/**
+ * Ask visitors to confirm they own their videos (the rights checkbox under the uploader).
+ * Off while the site is private and used for testing; turn it back on before opening it to the public.
+ */
+export const ASK_RIGHTS = false;
+/** Stored as the attestation version on videos uploaded while ASK_RIGHTS is off. */
+export const RIGHTS_NOT_ASKED = "not-asked";
 export const ACCEPTED_TYPES = ["video/mp4", "video/quicktime", "video/webm", "video/x-matroska"];

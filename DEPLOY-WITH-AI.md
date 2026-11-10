@@ -354,3 +354,4 @@ On `https://<your-domain>`:
 | HTTPS | Let's Encrypt via Vercel, auto-renews |
 | Retention | 3 days (by upload time); cleanup job daily 03:00 UTC (`vercel.json`) |
 | Access | passcode gate (`SITE_PASSCODE`, Secret on Vercel), entry lasts 6 hours (`GATE_HOURS`); no logins |
+| Rights checkbox | **off** while the site is private and for testing (`ASK_RIGHTS = false` in `lib/plans.ts`): uploads aren't asked "I own these videos" and are stored as `not-asked`. Turn it back on (`true`) and redeploy **before opening the site to the public** |

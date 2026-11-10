@@ -69,7 +69,8 @@ try {
   const bad = await call(A, "POST", "/api/videos", { batchId: batch.id, filename: "x.exe", contentType: "application/x-msdownload", sizeBytes: 10, attest: true, attestationVersion: "v" });
   check("wrong type -> 400", bad.status === 400);
   const noAttest = await call(A, "POST", "/api/videos", { batchId: batch.id, filename: "a.webm", contentType: "video/webm", sizeBytes: 10, attestationVersion: "v" });
-  check("missing attestation -> 400", noAttest.status === 400);
+  // The rights box is off while the site is in testing (ASK_RIGHTS = false): accepted, stored as "not-asked".
+  check("no attestation while ASK_RIGHTS is off -> 201, stored as not-asked", noAttest.status === 201 && noAttest.json.video?.attestationVersion === "not-asked", JSON.stringify(noAttest.json).slice(0, 200));
   const v = await call(A, "POST", "/api/videos", { batchId: batch.id, filename: "a.webm", contentType: "video/webm", sizeBytes: tinyVideo.length, attest: true, attestationVersion: "2026-11-07" });
   check("create video + upload url", v.status === 201 && v.json.upload?.url?.startsWith("http"), JSON.stringify(v.json));
   const video = v.json.video;

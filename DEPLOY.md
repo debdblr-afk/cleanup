@@ -241,3 +241,4 @@ After about 2 minutes it prints **Production URL: https://<name>.vercel.app**.
 | HTTPS | Let's Encrypt via Vercel, renews automatically |
 | Retention | 3 days (`retentionDays` in `lib/plans.ts`, applies to existing videos too); cleanup job daily at 03:00 UTC |
 | Access | passcode gate (`SITE_PASSCODE`, Secret on Vercel), entry lasts 6 hours (`GATE_HOURS` in `lib/gate.ts`); no logins. Change or delete it in Vercel settings, then redeploy |
+| Rights checkbox | **off** while the site is private and for testing (`ASK_RIGHTS = false` in `lib/plans.ts`): uploads aren't asked "I own these videos" and are stored as `not-asked`. Turn it back on (`true`) and redeploy **before opening the site to the public** |

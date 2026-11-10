@@ -7,7 +7,7 @@ import { makeSampleClip } from "@/lib/engine/sample";
 import { formatBytes, formatDuration } from "@/lib/format";
 import { useStore } from "@/lib/data/hooks";
 import { addVideos, createBatch, getPlan, hasAttested, liveVideos, setAttested, type Rejection } from "@/lib/data/store";
-import { BATCH_LIMIT } from "@/lib/plans";
+import { ASK_RIGHTS, BATCH_LIMIT } from "@/lib/plans";
 import { Button, Checkbox } from "@/components/ui/primitives";
 import { toast } from "@/components/ui/toast";
 
@@ -28,7 +28,7 @@ function rejectionText(r: Rejection, maxBytes: number, maxMs: number): string {
 }
 
 /**
- * Dropzone + rights checkbox + sample clip. "hero" on S01 creates a batch and goes to it;
+ * Dropzone + rights checkbox (only while ASK_RIGHTS is on) + sample clip. "hero" on S01 creates a batch and goes to it;
  * "tile" on S02 adds to the batch it's given.
  */
 export function UploadPanel({ variant, batchId }: { variant: "hero" | "tile"; batchId?: string }) {
@@ -164,13 +164,15 @@ export function UploadPanel({ variant, batchId }: { variant: "hero" | "tile"; ba
         </div>
       </div>
 
-      <div className="flex gap-3 items-start text-sm">
-        <Checkbox id={checkId} checked={attested} onChange={attest} invalid={!!error && !attested} describedBy={error ? errId : undefined} />
-        <label htmlFor={checkId}>
-          I own these videos or have permission to edit them, and I won&apos;t use Cleanup to remove someone else&apos;s watermark.{" "}
-          <Link href="/legal/terms" className="text-accent underline">Terms</Link>
-        </label>
-      </div>
+      {ASK_RIGHTS && (
+        <div className="flex gap-3 items-start text-sm">
+          <Checkbox id={checkId} checked={attested} onChange={attest} invalid={!!error && !attested} describedBy={error ? errId : undefined} />
+          <label htmlFor={checkId}>
+            I own these videos or have permission to edit them, and I won&apos;t use Cleanup to remove someone else&apos;s watermark.{" "}
+            <Link href="/legal/terms" className="text-accent underline">Terms</Link>
+          </label>
+        </div>
+      )}
       {error && <p id={errId} role="alert" className="text-sm text-danger">{error}</p>}
 
       <details className="text-sm">
