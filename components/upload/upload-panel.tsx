@@ -1,5 +1,5 @@
 "use client";
-import { Film, Link2, Plus, Sparkles, Upload } from "lucide-react";
+import { Film, Plus, Sparkles, Upload } from "lucide-react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useCallback, useEffect, useId, useRef, useState } from "react";
@@ -174,11 +174,6 @@ export function UploadPanel({ variant, batchId }: { variant: "hero" | "tile"; ba
         </div>
       )}
       {error && <p id={errId} role="alert" className="text-sm text-danger">{error}</p>}
-
-      <details className="text-sm">
-        <summary className="cursor-pointer inline-flex items-center gap-2 text-text-muted hover:text-text"><Link2 className="size-4" aria-hidden />Add from a link</summary>
-        <p className="mt-2 text-xs text-text-muted">Importing from a link isn&apos;t available yet. Download the file and upload it for now.</p>
-      </details>
     </div>
   );
 }
