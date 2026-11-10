@@ -14,7 +14,7 @@ export const metadata: Metadata = {
   description: "Remove your own logos, burned-in captions and stray text from videos you own. Preview free in your browser.",
 };
 
-export const viewport: Viewport = { themeColor: "#ffffff", colorScheme: "light" };
+export const viewport: Viewport = { themeColor: "#f0eee9", colorScheme: "light" };
 
 export default function RootLayout({ children }: Readonly<{ children: React.ReactNode }>) {
   return (

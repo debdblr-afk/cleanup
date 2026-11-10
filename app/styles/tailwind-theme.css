@@ -24,6 +24,7 @@
   --color-canvas-raised: var(--t-color-canvas-raised);
   --color-on-canvas: var(--t-color-on-canvas);
   --color-canvas-muted: var(--t-color-canvas-muted);
+  --color-accent-on-canvas: var(--t-color-accent-on-canvas);
   --color-focus: var(--t-color-focus);
   --color-danger: var(--t-color-danger);
   --color-danger-soft: var(--t-color-danger-soft);

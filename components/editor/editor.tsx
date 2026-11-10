@@ -345,7 +345,7 @@ export function Editor({ video }: { video: Video }) {
                     className="w-full accent-[var(--t-color-on-canvas)]"
                   />
                   {previewEnd > 0 && previewEnd < 1 && (
-                    <span className="absolute -top-1 w-0.5 h-5 bg-accent pointer-events-none" style={{ left: `${previewEnd * 100}%` }} title="The free preview ends here" aria-hidden />
+                    <span className="absolute -top-1 w-0.5 h-5 bg-accent-on-canvas pointer-events-none" style={{ left: `${previewEnd * 100}%` }} title="The free preview ends here" aria-hidden />
                   )}
                 </div>
                 <IconButton tone="canvas" label={muted ? "Unmute" : "Mute"} onClick={() => setMuted(!muted)} className="size-8">
