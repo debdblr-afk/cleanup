@@ -286,7 +286,7 @@ union all select 'migrations recorded', (select count(*)::text from supabase_mig
 
 On `https://<your-domain>`:
 0. The **"Enter the passcode"** page appears first; a wrong passcode says "That passcode isn't right."; the right one opens the site (for 6 hours).
-1. Tick the rights box, upload a short video **with sound** → **Preview ready**.
+1. Upload a short video **with sound** (there's no rights checkbox while `ASK_RIGHTS` is off) → **Preview ready**.
 2. Card → **Export** → dialog says **"Unlimited exports."** → **Export 720p** (keep the tab open) → **Download**. **Check:** the file plays at full length **with sound**.
 3. Batch page shows **"kept until"** a date **3 days** after upload.
 4. `https://<your-domain>/pricing` redirects to the home page (no plans).
@@ -355,3 +355,4 @@ On `https://<your-domain>`:
 | Retention | 3 days (by upload time); cleanup job daily 03:00 UTC (`vercel.json`) |
 | Access | passcode gate (`SITE_PASSCODE`, Secret on Vercel), entry lasts 6 hours (`GATE_HOURS`); no logins |
 | Rights checkbox | **off** while the site is private and for testing (`ASK_RIGHTS = false` in `lib/plans.ts`): uploads aren't asked "I own these videos" and are stored as `not-asked`. Turn it back on (`true`) and redeploy **before opening the site to the public** |
+| Look | colours are shades of PANTONE 11-4201 **Cloud Dancer** (page #F0EEE9, cards #F8F7F4); accent green #0A6B58. Edit `replica-watermark/design/tokens.json`, then `npm run tokens` |
